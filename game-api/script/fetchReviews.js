@@ -7,11 +7,16 @@ const COMMON_HEADERS = {
   'Origin': 'https://opencritic.com'
 };
 
+// 1. 오픈크리틱 검색 함수
 async function fetchOpenCriticId(title) {
   try {
-    const searchUrl = `https://api.opencritic.com/api/meta/search?criteria=${encodeURIComponent(title)}`;
+    // 특수기호(™, ®) 제거 및 인코딩
+    const cleanTitle = title.replace(/[™®]/g, '').trim();
+    const searchUrl = `https://api.opencritic.com/api/meta/search?criteria=${encodeURIComponent(cleanTitle)}`;
+    
     const res = await fetch(searchUrl, { headers: COMMON_HEADERS });
     if (!res.ok) return null;
+    
     const results = await res.json();
     return (results && results.length > 0) ? results[0].id : null;
   } catch (e) {
@@ -19,9 +24,24 @@ async function fetchOpenCriticId(title) {
   }
 }
 
+// ⭐ 2. 스팀 API를 이용해 영어 이름 가져오는 마법의 함수!
+async function getSteamEnglishName(appId) {
+  try {
+    // l=english 옵션을 주면 스팀에서 무조건 영어 이름을 줍니다.
+    const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=english`);
+    const json = await res.json();
+    if (json[appId] && json[appId].success) {
+      return json[appId].data.name;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// 3. 전문가 리뷰 가져오는 함수
 async function fetchCriticReviews(openCriticGameId) {
   try {
-    // 오픈크리틱 리뷰 목록 엔드포인트
     const url = `https://api.opencritic.com/api/review/game/${openCriticGameId}`;
     const res = await fetch(url, { headers: COMMON_HEADERS });
     if (!res.ok) return [];
@@ -30,48 +50,60 @@ async function fetchCriticReviews(openCriticGameId) {
   } catch (e) {
     return [];
   }
-}
+}   
 
 async function main() {
   console.log("🚀 전문가 평론 수집 시작...");
 
-  // 1. 우리 DB에서 게임 목록 가져오기
   const { data: games, error } = await supabase.from('games').select('*');
   if (error) return console.error("DB 에러:", error.message);
 
   let totalSaved = 0;
 
   for (const game of games) {
-    // 2. 오픈크리틱 ID 찾기 (점수 데이터에 저장된 게 있으면 좋겠지만, 없으면 검색)
-    // (이미지를 통해 스팀 ID -> 제목 -> 오픈크리틱 ID 찾는 과정 생략하고 바로 제목 검색)
-    const openCriticId = await fetchOpenCriticId(game.title);
+    process.stdout.write(`🔍 [${game.title}] 확인 중... `);
+
+    // 1단계: 일단 우리 DB에 있는 이름(한글/특수기호)으로 검색 시도
+    let openCriticId = await fetchOpenCriticId(game.title);
+
+    // 2단계: 실패했다면? 스팀 이미지 주소에서 AppID를 뽑아 영어 이름을 알아낸 뒤 재검색!
+    if (!openCriticId && game.image_url) {
+      const appIdMatch = game.image_url.match(/\/apps\/(\d+)\//);
+      if (appIdMatch) {
+        const steamAppId = appIdMatch[1];
+        const englishName = await getSteamEnglishName(steamAppId);
+        
+        if (englishName && englishName !== game.title) {
+          process.stdout.write(`\n   🔄 영문명(${englishName})으로 재검색 중... `);
+          openCriticId = await fetchOpenCriticId(englishName);
+        }
+      }
+    }
 
     if (!openCriticId) {
-      console.log(`⏩ [${game.title}] 오픈크리틱 정보 없음`);
+      console.log(`⏩ 오픈크리틱 정보 없음 (검색 실패)`);
       continue;
     }
 
-    process.stdout.write(`🔍 [${game.title}] 리뷰 수집 중... `);
-
-    // 3. 리뷰 데이터 가져오기
+    // 3단계: 리뷰 데이터 가져오기
     const reviews = await fetchCriticReviews(openCriticId);
     
-    // 4. 상위 3개만 저장 (너무 많으면 지저분함)
+    // 4단계: 상위 3개만 정제
     const topReviews = reviews.slice(0, 3).map(r => ({
       game_id: game.id,
       outlet: r.Outlet ? r.Outlet.name : "Unknown",
       author: r.Authors && r.Authors.length > 0 ? r.Authors[0].name : "",
-      rating: r.score,
-      content: r.snippet, // 리뷰 요약 (핵심!)
+      rating: r.score || 0, // 점수가 비어있으면 0 처리
+      content: r.snippet, 
       url: r.externalUrl
-    })).filter(r => r.content); // 내용 있는 것만
+    })).filter(r => r.content); // 내용이 비어있는 리뷰는 버림
 
     if (topReviews.length > 0) {
       const { error: insertError } = await supabase
         .from('critic_reviews')
         .insert(topReviews);
       
-      if (insertError) console.log("❌ 저장 실패");
+      if (insertError) console.log("❌ 저장 실패:", insertError.message);
       else {
         console.log(`✅ ${topReviews.length}개 저장 완료`);
         totalSaved += topReviews.length;
@@ -80,12 +112,11 @@ async function main() {
       console.log("⚠️ 리뷰 없음");
     }
 
-    // 차단 방지 딜레이
-    
+    // 서버 차단 방지 딜레이 (1초)
     await new Promise(r => setTimeout(r, 1000));
   }
 
-  console.log(`🎉 작업 끝! 총 ${totalSaved}개의 평론을 저장했습니다.`);
+  console.log(`🎉 작업 끝! 총 ${totalSaved}개의 전문가 평론을 저장했습니다.`);
 }
 
 main();
