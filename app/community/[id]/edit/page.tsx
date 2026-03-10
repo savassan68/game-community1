@@ -105,7 +105,7 @@ export default function EditPage() {
       if (!file) return;
       const url = await uploadFileToStorage(file);
       if (!url) return;
-      exec("insertHTML", `<img src="${url}" class="editor-image" />`);
+      exec("insertHTML", `<img src="${url}" class="editor-image w-full rounded-xl my-4" />`);
     };
     input.click();
   };
@@ -158,15 +158,17 @@ export default function EditPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F8FF]">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-40">
+    // ⭐ [수정] bg-background, text-foreground
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      
+      {/* Header (다크 모드 대응) */}
+      <div className="bg-card border-b border-border sticky top-0 z-40 transition-colors">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.push("/")} className="text-2xl font-extrabold text-indigo-600 hover:text-indigo-700">GameSeed</button>
-            <div className="text-sm text-gray-500">커뮤니티 / 글 수정</div>
+            <button onClick={() => router.push("/")} className="text-2xl font-extrabold text-primary hover:text-primary/80 transition-colors">GameSeed</button>
+            <div className="text-sm text-muted-foreground border-l border-border pl-4">커뮤니티 / 글 수정</div>
           </div>
-          <button className="px-3 py-1 rounded bg-white border text-sm" onClick={() => router.back()}>
+          <button className="px-3 py-1.5 rounded bg-card border border-border text-sm font-medium hover:bg-accent transition-colors" onClick={() => router.back()}>
             취소
           </button>
         </div>
@@ -174,36 +176,37 @@ export default function EditPage() {
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-6 py-8">
+        {/* 제목 입력창 (bg-card) */}
         <input
-          className="w-full p-3 rounded border text-lg bg-white"
+          className="w-full p-4 rounded-xl border border-border text-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground transition-colors"
           placeholder="제목을 입력하세요"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
 
-        <div className="mt-2 flex gap-3 items-center">
+        <div className="mt-4 flex flex-wrap gap-3 items-center">
           <select
-            className="px-2 py-1 border rounded bg-white text-sm"
+            className="px-3 py-2 border border-border rounded-lg bg-card text-foreground text-sm focus:outline-none transition-colors"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
 
           <input
-            className="px-2 py-1 border rounded text-sm"
+            className="px-4 py-2 border border-border rounded-lg bg-card text-foreground text-sm focus:outline-none focus:border-primary/50 transition-colors flex-1"
             placeholder="태그 (쉼표로 구분)"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
           />
 
-          <label className="text-sm flex gap-1 items-center">
-            <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
-            익명
+          <label className="text-sm flex gap-2 items-center px-3 py-2 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent transition-colors">
+            <input type="checkbox" className="accent-primary" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+            <span className="text-muted-foreground font-medium">익명</span>
           </label>
         </div>
 
-        {/* 🔥 글쓰기 페이지와 동일한 Toolbar UI 적용 */}
+        {/* Toolbar */}
         <Toolbar
           exec={exec}
           insertImage={insertImage}
@@ -212,24 +215,26 @@ export default function EditPage() {
           deleteSelectedImage={deleteSelectedImage}
         />
 
-        <div className="bg-white border rounded shadow-sm mt-2 relative">
+        {/* 에디터 영역 (prose-invert 추가) */}
+        <div className="bg-card border border-border rounded-xl shadow-sm mt-2 relative overflow-hidden transition-colors">
           <div
             ref={editorRef}
             contentEditable
             suppressContentEditableWarning
-            className="min-h-[300px] p-4 prose max-w-none focus:outline-none"
+            className="min-h-[400px] p-6 prose dark:prose-invert max-w-none focus:outline-none"
           />
         </div>
 
         {previewOpen && (
-          <div className="mt-4 bg-white border p-4 rounded shadow">
-            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || "" }} />
+          <div className="mt-6 bg-card border border-border p-6 rounded-xl shadow-sm transition-colors">
+            <h3 className="text-sm font-bold text-muted-foreground mb-4 border-b border-border pb-2">미리보기</h3>
+            <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || "" }} />
           </div>
         )}
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-6 flex justify-end">
           <button
-            className={`px-4 py-2 rounded text-white ${loading ? "bg-gray-400" : "bg-sky-600"}`}
+            className={`px-8 py-3 rounded-xl text-primary-foreground font-bold shadow-md transition-all ${loading ? "bg-muted text-muted-foreground" : "bg-primary hover:bg-primary/90 active:scale-95"}`}
             onClick={handleUpdate}
             disabled={loading}
           >
@@ -241,179 +246,77 @@ export default function EditPage() {
       {/* 이미지 삭제 팝업 */}
       {popupPos.visible && (
         <div
-          className="fixed bg-black bg-opacity-80 text-white text-sm px-3 py-2 rounded shadow-lg z-50 cursor-pointer"
+          className="fixed bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl z-50 cursor-pointer hover:bg-slate-800 transition-colors border border-white/10"
           style={{ top: popupPos.y + "px", left: popupPos.x + "px" }}
           onClick={deleteSelectedImage}
         >
-          🗑 삭제
+          🗑 이미지 삭제
         </div>
       )}
-
-      <style jsx>{`
-        .editor-image {
-          max-width: 100%;
-          border-radius: 10px;
-          margin: 12px 0;
-          cursor: pointer;
-        }
-        .editor-image:hover {
-          opacity: 0.9;
-          outline: 2px solid #3b82f6;
-        }
-      `}</style>
     </div>
   );
 }
 
-/* 🔥 글쓰기 페이지와 100% 동일한 Toolbar */
+/* 다크 모드 통합 Toolbar */
 function Toolbar({ exec, insertImage, previewOpen, setPreviewOpen, deleteSelectedImage }: any) {
   return (
-    <div className="bg-white border p-3 rounded mt-4 mb-3">
-      <div className="flex flex-wrap gap-2 items-center">
+    <div className="bg-card border border-border p-2 rounded-xl mt-4 mb-3 shadow-sm sticky top-20 z-30 transition-colors">
+      <div className="flex flex-wrap gap-1 items-center">
+        <ToolButton icon="B" label="굵게" onClick={() => exec("bold")} bold />
+        <ToolButton icon="I" label="기울임" onClick={() => exec("italic")} italic />
+        <ToolButton icon="U" label="밑줄" onClick={() => exec("underline")} underline />
+        <ToolButton icon="S" label="취소선" onClick={() => exec("strikeThrough")} strike />
+        
+        <div className="w-px h-5 bg-border mx-1" />
 
-        {/* Bold */}
+        <ToolButton icon="Left" label="왼쪽 정렬" onClick={() => exec("justifyLeft")} />
+        <ToolButton icon="Center" label="가운데 정렬" onClick={() => exec("justifyCenter")} />
+        
+        <div className="w-px h-5 bg-border mx-1" />
+
+        <ToolButton icon="• List" label="글머리" onClick={() => exec("insertUnorderedList")} />
+        <ToolButton icon="1. List" label="번호" onClick={() => exec("insertOrderedList")} />
+
+        <div className="w-px h-5 bg-border mx-1" />
+
+        <button className="p-2 rounded hover:bg-accent text-muted-foreground transition-colors" title="이미지 삽입" onClick={insertImage}>
+          🖼 사진
+        </button>
+        <button className="p-2 rounded hover:bg-accent text-muted-foreground transition-colors" title="선택 이미지 삭제" onClick={deleteSelectedImage}>
+          🗑 삭제
+        </button>
+
         <button
-          className="toolbar-btn font-bold text-lg"
-          title="굵게"
-          onClick={() => exec("bold")}
-        >
-          가
-        </button>
-
-        {/* Italic */}
-        <button
-          className="toolbar-btn italic text-lg"
-          title="기울임"
-          onClick={() => exec("italic")}
-        >
-          가
-        </button>
-
-        {/* Underline */}
-        <button
-          className="toolbar-btn text-lg underline"
-          title="밑줄"
-          onClick={() => exec("underline")}
-        >
-          가
-        </button>
-
-        {/* Strike */}
-        <button
-          className="toolbar-btn text-lg line-through"
-          title="취소선"
-          onClick={() => exec("strikeThrough")}
-        >
-          가
-        </button>
-
-        <div className="w-px h-6 bg-gray-300 mx-2" />
-
-        {/* Align Left */}
-        <button
-          className="toolbar-btn"
-          title="왼쪽 정렬"
-          onClick={() => exec("justifyLeft")}
-        >
-          <div className="flex flex-col gap-[2px]">
-            <span className="block w-4 h-[2px] bg-gray-700"></span>
-            <span className="block w-3 h-[2px] bg-gray-700"></span>
-            <span className="block w-5 h-[2px] bg-gray-700"></span>
-          </div>
-        </button>
-
-        {/* Align Center */}
-        <button
-          className="toolbar-btn"
-          title="가운데 정렬"
-          onClick={() => exec("justifyCenter")}
-        >
-          <div className="flex flex-col gap-[2px] items-center">
-            <span className="block w-5 h-[2px] bg-gray-700"></span>
-            <span className="block w-3 h-[2px] bg-gray-700"></span>
-            <span className="block w-4 h-[2px] bg-gray-700"></span>
-          </div>
-        </button>
-
-        {/* Align Right */}
-        <button
-          className="toolbar-btn"
-          title="오른쪽 정렬"
-          onClick={() => exec("justifyRight")}
-        >
-          <div className="flex flex-col gap-[2px] items-end">
-            <span className="block w-4 h-[2px] bg-gray-700"></span>
-            <span className="block w-3 h-[2px] bg-gray-700"></span>
-            <span className="block w-5 h-[2px] bg-gray-700"></span>
-          </div>
-        </button>
-
-        {/* Unordered List */}
-        <button
-          className="toolbar-btn"
-          title="글머리 기호"
-          onClick={() => exec("insertUnorderedList")}
-        >
-          • 목록
-        </button>
-
-        {/* Ordered List */}
-        <button
-          className="toolbar-btn"
-          title="번호 목록"
-          onClick={() => exec("insertOrderedList")}
-        >
-          1. 목록
-        </button>
-
-        {/* Code Block */}
-        <button
-          className="toolbar-btn font-mono text-xs"
-          title="코드 삽입"
-          onClick={() =>
-            exec("insertHTML", "<pre class='bg-gray-100 p-2 rounded'>코드 입력</pre>")
-          }
-        >
-          {"</>"}
-        </button>
-
-        {/* Insert Image */}
-        <button className="toolbar-btn" title="이미지 삽입" onClick={insertImage}>
-          🖼
-        </button>
-
-        {/* Delete Image */}
-        <button className="toolbar-btn" title="선택 이미지 삭제" onClick={deleteSelectedImage}>
-          🗑
-        </button>
-
-        {/* Preview */}
-        <button
-          className="px-2 py-1 border rounded text-sm ml-auto"
+          className="ml-auto px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
           onClick={() => setPreviewOpen((v: any) => !v)}
         >
-          {previewOpen ? "미리보기 닫기" : "미리보기"}
+          {previewOpen ? "닫기" : "미리보기"}
         </button>
       </div>
+    </div>
+  );
+}
 
-      <style jsx>{`
-        .toolbar-btn {
-          padding: 6px 8px;
-          background: white;
-          border: 1px solid #dee3ea;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          min-width: 32px;
-          min-height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .toolbar-btn:hover {
-          background: #eef2f8;
-        }
-      `}</style>
+function ToolButton({ icon, label, onClick, bold, italic, underline, strike }: any) {
+  return (
+    <button
+      className={`p-2 min-w-[32px] rounded hover:bg-accent transition-colors text-muted-foreground flex items-center justify-center ${bold ? "font-bold" : ""} ${italic ? "italic" : ""} ${underline ? "underline" : ""} ${strike ? "line-through" : ""}`}
+      title={label}
+      onClick={onClick}
+    >
+      {icon === "Left" && <AlignIcon type="left" />}
+      {icon === "Center" && <AlignIcon type="center" />}
+      {icon !== "Left" && icon !== "Center" ? icon : null}
+    </button>
+  );
+}
+
+function AlignIcon({ type }: { type: "left" | "center" }) {
+  return (
+    <div className={`flex flex-col gap-[2px] ${type === "center" ? "items-center" : "items-start"}`}>
+      <span className="block w-3 h-[2px] bg-current opacity-70"></span>
+      <span className="block w-2 h-[2px] bg-current opacity-70"></span>
+      <span className="block w-3 h-[2px] bg-current opacity-70"></span>
     </div>
   );
 }

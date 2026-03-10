@@ -30,11 +30,11 @@ export default function LoginPage() {
     }
   };
 
-  // ✅ [수정됨] 네이버 로그인 핸들러 (타입 에러 수정 & 아이콘 적용)
+  // 🔹 네이버 로그인 핸들러
   const handleNaverLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "naver" as any, // 'naver' 타입 에러 방지용 as any
+        provider: "naver" as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -54,7 +54,6 @@ export default function LoginPage() {
     try {
       let finalEmail = loginId.trim();
 
-      // 1. 입력값이 이메일 형식(@)이 아니면 -> 아이디로 간주하고 이메일 찾기
       if (!loginId.includes("@")) {
         const { data, error } = await supabase
           .from("user_profiles")
@@ -68,7 +67,6 @@ export default function LoginPage() {
         finalEmail = data.email;
       }
 
-      // 2. 로그인 시도
       const { error } = await supabase.auth.signInWithPassword({
         email: finalEmail,
         password,
@@ -90,22 +88,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">로그인 👋</h1>
-          <p className="text-gray-500 text-sm">아이디 또는 이메일로 로그인하세요.</p>
+    // ⭐ [배경] bg-background, text-foreground
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4 transition-colors duration-300">
+      {/* ⭐ [카드] bg-card, border-border */}
+      <div className="max-w-md w-full bg-card rounded-3xl shadow-lg overflow-hidden border border-border p-8 transition-colors">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <button 
+            onClick={() => router.push("/")} 
+            className="text-3xl font-extrabold font-sans text-primary hover:opacity-80 mb-6 tracking-tight transition-colors"
+          >
+            GameSeed
+          </button>
+          
+          <h1 className="text-2xl font-extrabold text-foreground mb-2 transition-colors">로그인 👋</h1>
+          <p className="text-muted-foreground text-sm transition-colors">아이디 또는 이메일로 로그인하세요.</p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm rounded-xl">
             ⚠️ {errorMsg}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-bold text-muted-foreground mb-1.5">
               아이디 또는 이메일
             </label>
             <input
@@ -113,33 +120,34 @@ export default function LoginPage() {
               required
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              // ⭐ [입력창] bg-muted, text-foreground 명시
+              className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
               placeholder="user_id 또는 name@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <label className="block text-sm font-bold text-muted-foreground mb-1.5">비밀번호</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
               placeholder="••••••••"
             />
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-2">
             <div className="flex items-center">
               <input
                 id="remember-me"
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer"
+                className="h-4 w-4 text-primary bg-muted border-border rounded cursor-pointer focus:ring-primary"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer select-none">
+              <label htmlFor="remember-me" className="ml-2 block text-sm font-medium text-muted-foreground cursor-pointer select-none">
                 로그인 유지
               </label>
             </div>
@@ -147,7 +155,7 @@ export default function LoginPage() {
             <div className="text-sm">
               <Link 
                 href="/auth/reset-password" 
-                className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline"
+                className="font-bold text-primary hover:underline"
               >
                 아이디/비밀번호 찾기
               </Link>
@@ -157,8 +165,11 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 rounded-lg text-white font-bold text-sm shadow-md transition-all ${
-              loading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
+            // ⭐ [버튼] 시스템 primary 색상 사용
+            className={`w-full py-3.5 mt-6 rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.98] ${
+              loading 
+                ? "bg-muted text-muted-foreground cursor-not-allowed" 
+                : "bg-primary text-primary-foreground hover:opacity-90"
             }`}
           >
             {loading ? "로그인 중..." : "로그인하기"}
@@ -166,20 +177,20 @@ export default function LoginPage() {
         </form>
 
         {/* 소셜 로그인 영역 */}
-        <div className="mt-6">
+        <div className="mt-8">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">또는</span>
+              <span className="px-3 bg-card text-muted-foreground font-medium">또는</span>
             </div>
           </div>
 
-          {/* 구글 버튼 */}
+          {/* 구글 버튼 - 다크모드 대응 */}
           <button
             onClick={handleGoogleLogin}
-            className="mt-6 w-full py-3 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold text-sm shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+            className="mt-6 w-full py-3.5 rounded-xl bg-card border border-border text-foreground font-bold text-sm shadow-sm hover:bg-muted transition-all flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -190,27 +201,27 @@ export default function LoginPage() {
             Google로 계속하기
           </button>
 
+          {/* 네이버 버튼 */}
           <button
-  onClick={handleNaverLogin}
-  className="mt-3 w-full py-3 rounded-lg bg-[#03C75A] text-white font-bold text-sm shadow-sm hover:bg-[#02b351] transition-all flex items-center justify-center gap-2"
->
-  {/* 👇 수정된 네이버 아이콘 (더 선명한 버전) */}
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-    fill="currentColor"
-  >
-    <path d="M16.273 12.845L7.376 0H0v24h7.727V11.156L16.624 24H24V0h-7.727v12.845z" />
-  </svg>
-  Naver로 계속하기
-</button>
+            onClick={handleNaverLogin}
+            className="mt-3 w-full py-3.5 rounded-xl bg-[#03C75A] text-white font-bold text-sm shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+            >
+              <path d="M16.273 12.845L7.376 0H0v24h7.727V11.156L16.624 24H24V0h-7.727v12.845z" />
+            </svg>
+            Naver로 계속하기
+          </button>
         </div>
 
-        <div className="mt-6 text-center text-sm">
-          <span className="text-gray-500">계정이 없으신가요? </span>
-          <Link href="/auth/signup" className="text-indigo-600 hover:underline font-bold">
+        <div className="mt-8 text-center text-sm">
+          <span className="text-muted-foreground font-medium">계정이 없으신가요? </span>
+          <Link href="/auth/signup" className="text-primary hover:underline font-bold">
             회원가입하기
           </Link>
         </div>

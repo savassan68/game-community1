@@ -42,9 +42,8 @@ async function main() {
         }));
 
         // 4. 저장 (중복 방지 로직이 없으므로 계속 쌓일 수 있음. 필요시 기존 것 삭제 후 추가)
-        // 여기서는 그냥 추가합니다.
         const { error: insertError } = await supabase
-          .from('reviews')
+          .from('steam_reviews') // ⭐ 새로 만든 스팀 전용 테이블로 쏙!
           .insert(reviewsToInsert);
 
         if (insertError) {

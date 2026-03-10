@@ -17,9 +17,6 @@ export default function ResetPasswordPage() {
     setErrorMsg(null);
 
     try {
-      // Supabase 비밀번호 재설정 이메일 발송
-      // 사용자가 이메일의 링크를 클릭하면 /auth/update-password 페이지로 이동하게 설정
-      // (주의: 실제 배포 시에는 사이트 도메인으로 바꿔야 합니다)
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/update-password`,
       });
@@ -35,19 +32,23 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 p-8">
+    // ⭐ [배경] 시스템 변수 적용
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4 transition-colors duration-300">
+      
+      {/* ⭐ [카드] 통일감 있게 bg-card, border-border, rounded-3xl 적용 */}
+      <div className="max-w-md w-full bg-card rounded-3xl shadow-lg overflow-hidden border border-border p-8 transition-colors">
+        
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">비밀번호 찾기 🔐</h1>
-          <p className="text-gray-500 text-sm">
+          <h1 className="text-2xl font-extrabold text-foreground mb-2 transition-colors">비밀번호 찾기 🔐</h1>
+          <p className="text-muted-foreground text-sm transition-colors">
             가입한 이메일을 입력하시면<br />
             비밀번호 재설정 링크를 보내드립니다.
           </p>
         </div>
 
-        {/* 성공 메시지 */}
+        {/* 성공 메시지 - 다크모드에서도 잘 보이도록 반투명 배경 사용 */}
         {message && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-700 text-sm rounded-lg text-center">
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-bold rounded-xl text-center transition-colors">
             <div className="text-2xl mb-2">✅</div>
             {message}
           </div>
@@ -55,7 +56,7 @@ export default function ResetPasswordPage() {
 
         {/* 에러 메시지 */}
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+          <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm rounded-xl flex items-center gap-2 transition-colors">
             ⚠️ {errorMsg}
           </div>
         )}
@@ -63,22 +64,26 @@ export default function ResetPasswordPage() {
         {!message && (
           <form onSubmit={handleReset} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+              <label className="block text-sm font-bold text-muted-foreground mb-1.5 transition-colors">이메일</label>
+              {/* ⭐ [입력창] 로그인/가입 페이지와 동일하게 bg-muted 사용 */}
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                 placeholder="name@example.com"
               />
             </div>
 
+            {/* ⭐ [버튼] 시스템 primary 색상 사용 */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-lg text-white font-bold text-sm shadow-md transition-all ${
-                loading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"
+              className={`w-full py-3.5 mt-2 rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.98] ${
+                loading 
+                  ? "bg-muted text-muted-foreground cursor-not-allowed" 
+                  : "bg-primary text-primary-foreground hover:opacity-90"
               }`}
             >
               {loading ? "전송 중..." : "재설정 링크 보내기"}
@@ -86,8 +91,8 @@ export default function ResetPasswordPage() {
           </form>
         )}
 
-        <div className="mt-6 text-center text-sm">
-          <Link href="/auth/login" className="text-gray-500 hover:text-indigo-600 font-medium flex items-center justify-center gap-1">
+        <div className="mt-8 text-center text-sm border-t border-border pt-6 transition-colors">
+          <Link href="/auth/login" className="text-muted-foreground hover:text-primary font-bold flex items-center justify-center gap-1 transition-colors">
             <span>←</span> 로그인 페이지로 돌아가기
           </Link>
         </div>

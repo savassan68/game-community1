@@ -6,11 +6,11 @@ import Link from "next/link";
 
 export default function SignupPage() {
   // 입력 필드 상태 관리
-  const [username, setUsername] = useState(""); // 아이디
-  const [email, setEmail] = useState(""); // 이메일
-  const [password, setPassword] = useState(""); // 비밀번호
-  const [confirmPassword, setConfirmPassword] = useState(""); // 비밀번호 확인
-  const [nickname, setNickname] = useState(""); // 닉네임
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [nickname, setNickname] = useState("");
   
   // 이미지 관련 상태
   const [profileImage, setProfileImage] = useState<File | null>(null);
@@ -20,12 +20,10 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // 이미지 선택 핸들러
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProfileImage(file);
-      // 미리보기 URL 생성
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
     }
@@ -37,7 +35,6 @@ export default function SignupPage() {
     setErrorMsg(null);
 
     try {
-      // 1. 유효성 검사
       if (password !== confirmPassword) {
         throw new Error("비밀번호가 일치하지 않습니다.");
       }
@@ -47,34 +44,29 @@ export default function SignupPage() {
 
       let avatarUrl = "";
 
-      // 2. 프로필 이미지 업로드 (이미지가 있다면)
       if (profileImage) {
         const fileExt = profileImage.name.split(".").pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        // 'avatars' 버킷에 업로드
         const { error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(filePath, profileImage);
 
         if (uploadError) throw uploadError;
 
-        // 업로드된 이미지의 공개 URL 가져오기
         const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
         avatarUrl = data.publicUrl;
       }
 
-      // 3. 회원가입 요청
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // 추가 정보는 data 객체에 담습니다.
           data: {
-            username,   // 아이디
-            nickname,   // 닉네임
-            avatar_url: avatarUrl, // 프로필 사진 주소
+            username,
+            nickname,
+            avatar_url: avatarUrl,
           },
         },
       });
@@ -90,15 +82,19 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 px-4 py-10">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 p-8">
+    // ⭐ [배경] bg-gradient-to-br from-indigo-50 ... -> bg-background
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4 py-10 transition-colors duration-300">
+      
+      {/* ⭐ [카드] bg-white -> bg-card, 테두리 border-border */}
+      <div className="max-w-md w-full bg-card rounded-3xl shadow-lg overflow-hidden border border-border p-8 transition-colors">
+        
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">회원가입 🚀</h1>
-          <p className="text-gray-500 text-sm">GameSeed의 회원이 되어주세요.</p>
+          <h1 className="text-2xl font-extrabold text-foreground mb-2 transition-colors">회원가입 🚀</h1>
+          <p className="text-muted-foreground text-sm transition-colors">GameSeed의 회원이 되어주세요.</p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm rounded-xl">
             ⚠️ {errorMsg}
           </div>
         )}
@@ -106,9 +102,9 @@ export default function SignupPage() {
         {successMsg ? (
           <div className="text-center py-10">
             <div className="text-4xl mb-4">📧</div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">이메일을 확인해주세요!</h3>
-            <p className="text-gray-600 text-sm mb-6">{successMsg}</p>
-            <Link href="/auth/login" className="text-indigo-600 hover:underline font-bold text-sm">
+            <h3 className="text-lg font-bold text-foreground mb-2">이메일을 확인해주세요!</h3>
+            <p className="text-muted-foreground text-sm mb-6">{successMsg}</p>
+            <Link href="/auth/login" className="text-primary hover:underline font-bold text-sm">
               로그인 페이지로 돌아가기
             </Link>
           </div>
@@ -118,15 +114,16 @@ export default function SignupPage() {
             {/* 📸 프로필 사진 업로드 */}
             <div className="flex flex-col items-center mb-6">
               <label className="relative cursor-pointer group">
-                <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-indigo-500 transition-colors">
+                {/* ⭐ [이미지 업로드 영역] bg-muted 적용 */}
+                <div className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center overflow-hidden hover:border-primary transition-colors">
                   {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl text-gray-400">📷</span>
+                    <span className="text-3xl opacity-50">📷</span>
                   )}
                 </div>
-                <div className="absolute bottom-0 right-0 bg-indigo-600 text-white p-1.5 rounded-full shadow-md">
+                <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-md">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                 </div>
                 <input 
@@ -136,44 +133,45 @@ export default function SignupPage() {
                   onChange={handleImageChange}
                 />
               </label>
-              <span className="text-xs text-gray-500 mt-2">프로필 사진 선택</span>
+              <span className="text-xs text-muted-foreground mt-2 font-medium">프로필 사진 선택</span>
             </div>
 
             {/* 🆔 아이디 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">아이디</label>
+              <label className="block text-sm font-bold text-muted-foreground mb-1.5">아이디</label>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                // ⭐ [입력창] bg-muted, text-foreground 명시하여 글씨가 잘 보이도록 수정
+                className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                 placeholder="사용할 아이디 입력"
               />
             </div>
 
             {/* 📛 닉네임 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">닉네임</label>
+              <label className="block text-sm font-bold text-muted-foreground mb-1.5">닉네임</label>
               <input
                 type="text"
                 required
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                 placeholder="커뮤니티에서 보일 이름"
               />
             </div>
 
             {/* 📧 이메일 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">이메일 주소</label>
+              <label className="block text-sm font-bold text-muted-foreground mb-1.5">이메일 주소</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                 placeholder="name@example.com"
               />
             </div>
@@ -181,41 +179,44 @@ export default function SignupPage() {
             {/* 🔒 비밀번호 */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                <label className="block text-sm font-bold text-muted-foreground mb-1.5">비밀번호</label>
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                   placeholder="6자 이상"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 확인</label>
+                <label className="block text-sm font-bold text-muted-foreground mb-1.5">비밀번호 확인</label>
                 <input
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none ${
+                  className={`w-full px-4 py-3 bg-muted border rounded-xl focus:ring-2 outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground ${
                     confirmPassword && password !== confirmPassword 
-                      ? "border-red-300 focus:ring-red-200" 
-                      : "border-gray-300 focus:ring-indigo-500"
+                      ? "border-destructive focus:ring-destructive/30" 
+                      : "border-border focus:ring-primary/50 focus:border-primary"
                   }`}
                   placeholder="비밀번호 재입력"
                 />
               </div>
             </div>
             {confirmPassword && password !== confirmPassword && (
-               <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>
+               <p className="text-xs font-bold text-destructive mt-1 ml-1">비밀번호가 일치하지 않습니다.</p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-lg text-white font-bold text-sm shadow-md transition-all mt-4 ${
-                loading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
+              // ⭐ [버튼] 시스템 primary 색상 사용
+              className={`w-full py-3.5 mt-6 rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.98] ${
+                loading 
+                  ? "bg-muted text-muted-foreground cursor-not-allowed" 
+                  : "bg-primary text-primary-foreground hover:opacity-90"
               }`}
             >
               {loading ? "가입 처리 중..." : "회원가입하기"}
@@ -223,9 +224,9 @@ export default function SignupPage() {
           </form>
         )}
 
-        <div className="mt-6 text-center text-sm border-t pt-4">
-          <span className="text-gray-500">이미 계정이 있으신가요? </span>
-          <Link href="/auth/login" className="text-indigo-600 hover:underline font-bold">
+        <div className="mt-6 text-center text-sm border-t border-border pt-6 transition-colors">
+          <span className="text-muted-foreground font-medium">이미 계정이 있으신가요? </span>
+          <Link href="/auth/login" className="text-primary hover:underline font-bold">
             로그인하기
           </Link>
         </div>
