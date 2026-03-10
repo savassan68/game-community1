@@ -226,10 +226,9 @@ export default function MyPage() {
   );
 
   return (
-    // ⭐ [수정] bg-background, text-foreground
     <div className="min-h-screen bg-background text-foreground py-10 px-4 sm:px-6 relative transition-colors duration-300">
       
-      {/* 본인 인증 모달 (보안탭) */}
+      {/* 본인 인증 모달 */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-card rounded-3xl shadow-xl max-w-sm w-full p-8 animate-fade-in-up border border-border transition-colors">
@@ -338,7 +337,11 @@ export default function MyPage() {
             <TabButton id="messages" label="쪽지함" icon={<Icons.Mail />} />
           </nav>
 
-          <button onClick={() => router.push("/")} className="w-full flex items-center justify-center gap-2 py-4 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">
+          {/* ⭐ '메인으로 돌아가기' 버튼: 모바일(lg 미만)에서는 숨김 (hidden lg:flex) */}
+          <button 
+            onClick={() => router.push("/")} 
+            className="hidden lg:flex w-full items-center justify-center gap-2 py-4 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+          >
             <Icons.ArrowLeft /> 메인으로 돌아가기
           </button>
         </aside>
