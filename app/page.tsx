@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
 
@@ -10,17 +10,17 @@ const Icons = {
   Star: () => <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>,
   ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
   Image: () => <svg className="w-6 h-6 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-  Gamepad: () => <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>
+  Gamepad: () => <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>,
+  Loader: () => <svg className="w-6 h-6 animate-spin text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
 };
 
 type Review = { id: number; game_id?: number; title: string; content: string; rating?: number; likes?: number; author_name?: string; created_at?: string; source?: string; games?: { title: string }; };
 type Community = { id: number; title: string; likes?: number; author_name?: string; created_at?: string; comment_count?: number; };
-type NewsPost = { id: string; title: string; summary: string; category?: string; image_url?: string; created_at?: string; };
-
 type TopGame = { id: number; title: string; image_url?: string; metacritic_score?: number; opencritic_score?: number; };
 
+// ⭐ 뉴스 카테고리 ID를 실제 API 카테고리와 동일하게 매칭 ("main" 사용)
 const NEWS_CATEGORIES = [
-  { id: "all", label: "전체" },
+  { id: "main", label: "전체" },
   { id: "industry", label: "산업" },
   { id: "esports", label: "eSports" },
   { id: "pc", label: "PC" },
@@ -33,13 +33,6 @@ const getNewsCategoryLabel = (catId: string) => {
   return found ? found.label : catId;
 };
 
-const DUMMY_NEWS: NewsPost[] = [
-  { id: "1", title: "GameSeed 뉴스 서비스, 다음 달 공식 오픈 예정!", summary: "유저분들의 많은 요청이 있었던 게임 뉴스 탭이 드디어 추가됩니다. 빠른 소식을 기대해주세요.", category: "industry", created_at: new Date().toISOString() },
-  { id: "2", title: "글로벌 eSports 대회, 한국 팀 결승 진출 확정", summary: "세계 최대 규모의 대회에서 한국 대표팀이 압도적인 기량으로 결승에 올랐습니다. 우승 트로피를 차지할 수 있을까요?", category: "esports", created_at: new Date().toISOString() },
-  { id: "3", title: "올해의 최고 기대작 PC 리뷰 모음", summary: "출시 전부터 뜨거운 관심을 모았던 대작들, 과연 유저들의 평가는 어떨까요? 평론 게시판에서 확인하세요.", category: "pc", created_at: new Date().toISOString() },
-  { id: "4", title: "모바일 게임 시장, 올해도 가파른 성장세 유지", summary: "신작 모바일 RPG들이 연이어 흥행하며 모바일 게임 시장의 파이를 키우고 있습니다.", category: "mobile", created_at: new Date().toISOString() },
-];
-
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -50,8 +43,10 @@ export default function HomePage() {
   const [latestCommunity, setLatestCommunity] = useState<Community[]>([]);
   const [topCommunity, setTopCommunity] = useState<Community[]>([]);
   
-  const [news, setNews] = useState<NewsPost[]>(DUMMY_NEWS);
-  const [activeNewsCategory, setActiveNewsCategory] = useState<string>("all");
+  // ⭐ 뉴스 관련 상태 (더미 데이터 삭제, 로딩 상태 추가)
+  const [news, setNews] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState<boolean>(true);
+  const [activeNewsCategory, setActiveNewsCategory] = useState<string>("main");
 
   useEffect(() => {
     const getUser = async () => {
@@ -70,6 +65,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const load = async () => {
+      // 게임, 리뷰, 커뮤니티 데이터 로드 (기존과 동일)
       const gamesRes = await supabase.from("games")
         .select("id, title, image_url, metacritic_score, opencritic_score")
         .not("image_url", "is", null)
@@ -88,21 +84,13 @@ export default function HomePage() {
         setTopGames(sortedGames);
       }
 
-      const latestRev = await supabase.from("reviews")
-        .select("*, games(title)")
-        .not("user_id", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(8);
+      const latestRev = await supabase.from("reviews").select("*, games(title)").not("user_id", "is", null).order("created_at", { ascending: false }).limit(8);
       if (!latestRev.error) setLatestReviews(latestRev.data as Review[]);
 
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       
-      const topRev = await supabase.from("reviews")
-        .select("*, games(title)")
-        .gte("created_at", oneWeekAgo.toISOString())
-        .order("likes", { ascending: false })
-        .limit(4);
+      const topRev = await supabase.from("reviews").select("*, games(title)").gte("created_at", oneWeekAgo.toISOString()).order("likes", { ascending: false }).limit(4);
       if (!topRev.error) setTopReviews(topRev.data as Review[]);
 
       const latestCom = await supabase.from("community").select("*, comments(count)").order("created_at", { ascending: false }).limit(8);
@@ -117,11 +105,7 @@ export default function HomePage() {
       const oneDayAgo = new Date();
       oneDayAgo.setHours(oneDayAgo.getHours() - 24);
 
-      const topCom = await supabase.from("community")
-        .select("*, comments(count)")
-        .gte("created_at", oneDayAgo.toISOString())
-        .order("likes", { ascending: false })
-        .limit(5);
+      const topCom = await supabase.from("community").select("*, comments(count)").gte("created_at", oneDayAgo.toISOString()).order("likes", { ascending: false }).limit(5);
       if (!topCom.error) {
         const formattedTop = topCom.data.map((item: any) => ({
           ...item,
@@ -133,10 +117,28 @@ export default function HomePage() {
     load();
   }, []);
 
-  const filteredNews = useMemo(() => {
-    if (activeNewsCategory === "all") return news;
-    return news.filter((n) => (n.category ?? "").toLowerCase() === activeNewsCategory.toLowerCase());
-  }, [news, activeNewsCategory]);
+  // ⭐ 실시간 뉴스 데이터 페칭
+  useEffect(() => {
+    const fetchRealNews = async () => {
+      setNewsLoading(true);
+      try {
+        const res = await fetch(`/api/gamemeca/list?category=${activeNewsCategory}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setNews(data);
+        } else {
+          setNews([]);
+        }
+      } catch (error) {
+        console.error("뉴스 로딩 실패:", error);
+        setNews([]);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+    
+    fetchRealNews();
+  }, [activeNewsCategory]);
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -223,44 +225,56 @@ export default function HomePage() {
                 ))}
               </div>
               
+              {/* ⭐ 뉴스 렌더링 영역 */}
               <div className="grid grid-cols-1 gap-4 mt-2">
-                {filteredNews.length > 0 ? filteredNews.slice(0, 4).map((n) => (
-                  <div 
-                    key={n.id} 
-                    onClick={() => router.push(`/news/${n.id}`)} 
-                    className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border"
-                  >
-                    <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border">
-                      {n.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={n.image_url} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Icons.Image />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        {n.category && (
-                          <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded tracking-wider">
-                            {getNewsCategoryLabel(n.category)}
-                          </span>
-                        )}
-                        <span className="text-[11px] font-medium text-muted-foreground">
-                          {n.created_at ? new Date(n.created_at).toLocaleDateString() : ""}
-                        </span>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">
-                        {n.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {n.summary}
-                      </p>
-                    </div>
+                {newsLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground font-bold">
+                    <Icons.Loader />
+                    <p className="mt-3 text-sm">최신 뉴스를 불러오는 중...</p>
                   </div>
-                )) : <div className="text-sm text-muted-foreground text-center py-10 border border-dashed border-border rounded-xl">해당 카테고리의 뉴스가 없습니다.</div>}
+                ) : news.length > 0 ? (
+                  news.slice(0, 4).map((n) => (
+                    <div 
+                      key={n.id} 
+                      onClick={() => router.push(`/news/detail?url=${encodeURIComponent(n.articleUrl)}`)} 
+                      className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border"
+                    >
+                      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border relative">
+                        {n.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={n.imageUrl} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Icons.Image />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {n.category && (
+                            <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded tracking-wider">
+                              {getNewsCategoryLabel(n.category)}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-medium text-muted-foreground">
+                            {n.createdAt || ""}
+                          </span>
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">
+                          {n.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                          {n.summary}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-10 border border-dashed border-border rounded-xl">
+                    해당 카테고리의 뉴스가 없습니다.
+                  </div>
+                )}
               </div>
             </section>
 
@@ -277,7 +291,6 @@ export default function HomePage() {
                       <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 truncate max-w-[150px]">
                         {r.games?.title || "알 수 없는 게임"}
                       </span>
-                      {/* ⭐ 하트 색상 변경: text-destructive -> text-primary */}
                       <span className="flex items-center gap-1 text-xs font-bold text-primary"><Icons.Heart /> {r.likes ?? 0}</span>
                     </div>
                     <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">{r.title}</h3>
