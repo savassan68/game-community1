@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import supabase from "../../../lib/supabaseClient";
+import supabase from "../../../lib/supabaseClient"; // 경로에 맞게 수정
 import { useRouter } from "next/navigation";
 
 const CATEGORIES = [
@@ -17,8 +17,11 @@ export default function WritePage() {
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("free");
-  const [tags, setTags] = useState<string>("");
-  const [anonymous, setAnonymous] = useState(false);
+  
+  // [주석 처리] 태그 및 익명 상태 변수
+  // const [tags, setTags] = useState<string>("");
+  // const [anonymous, setAnonymous] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -126,8 +129,7 @@ export default function WritePage() {
       title,
       content: contentHTML,
       category,
-      tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
-      author: anonymous ? "익명" : user.email,
+      author: user.email, 
       user_id: user.id,
       image_url: extractFirstImage(contentHTML)
     };
@@ -151,8 +153,9 @@ export default function WritePage() {
   };
 
   return (
-    // ⭐ [수정] bg-background, text-foreground
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      
+      {/* 이모지가 제거된 심플한 헤더 */}
       <Header />
 
       <div className="max-w-5xl mx-auto px-6 py-8">
@@ -177,33 +180,13 @@ export default function WritePage() {
           </div>
         </div>
 
-        {/* 제목 입력 - bg-card, border-border */}
+        {/* 제목 입력 */}
         <input
           className="w-full p-4 rounded-xl border border-border text-lg bg-card text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground transition-colors"
           placeholder="제목을 입력하세요"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-
-        {/* 태그 및 옵션 */}
-        <div className="mt-4 flex gap-3 items-center">
-          <input
-            className="flex-1 px-4 py-2 bg-card border border-border text-foreground rounded-lg text-sm focus:outline-none focus:border-primary/50 transition-colors"
-            placeholder="#태그 (쉼표로 구분)"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-          />
-
-          <label className="text-sm flex gap-2 items-center px-3 py-2 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent transition-colors">
-            <input
-              type="checkbox"
-              checked={anonymous}
-              onChange={(e) => setAnonymous(e.target.checked)}
-              className="accent-primary"
-            />
-            <span className="text-muted-foreground font-medium">익명</span>
-          </label>
-        </div>
 
         {/* 툴바 */}
         <Toolbar
@@ -214,7 +197,7 @@ export default function WritePage() {
           deleteSelectedImage={deleteSelectedImage}
         />
 
-        {/* 에디터 영역 - bg-card, prose-invert */}
+        {/* 에디터 영역 */}
         <div className="bg-card border border-border rounded-xl shadow-sm mt-2 relative overflow-hidden min-h-[400px] transition-colors">
           <div
             ref={editorRef}
@@ -249,8 +232,8 @@ export default function WritePage() {
           <button
             className={`px-8 py-3 rounded-xl text-primary-foreground font-bold shadow-md transition-all ${
               loading 
-               ? "bg-muted cursor-not-allowed text-muted-foreground" 
-               : "bg-primary hover:bg-primary/90 active:scale-95"
+                ? "bg-muted cursor-not-allowed text-muted-foreground" 
+                : "bg-primary hover:bg-primary/90 active:scale-95"
             }`}
             onClick={handleSubmit}
             disabled={loading}
@@ -260,14 +243,14 @@ export default function WritePage() {
         </div>
       </div>
 
-      {/* 이미지 삭제 팝업 - 다크 모드 시에도 가독성 좋게 유지 */}
+      {/* 이미지 삭제 팝업 - 이모지 제거 */}
       {popupPos.visible && (
         <div
           className="fixed bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl z-50 cursor-pointer hover:bg-slate-800 transition-colors border border-white/10"
           style={{ top: popupPos.y + "px", left: popupPos.x + "px" }}
           onClick={deleteSelectedImage}
         >
-          🗑 이미지 삭제
+          이미지 삭제
         </div>
       )}
 
@@ -275,7 +258,7 @@ export default function WritePage() {
       <style jsx>{`
         [contenteditable]:empty:before {
           content: attr(data-placeholder);
-          color: var(--muted-foreground); /* CSS 변수 사용 */
+          color: var(--muted-foreground); 
           display: block;
         }
       `}</style>
@@ -284,18 +267,15 @@ export default function WritePage() {
 }
 
 /* ------------------------------------------------
-   HEADER COMPONENT (Dark Mode)
+   HEADER COMPONENT
 ------------------------------------------------ */
 function Header() {
-  const router = useRouter();
   return (
-    <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-sm border-b border-border transition-colors">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <button onClick={() => router.push("/")} className="text-2xl font-extrabold text-primary hover:text-primary/80 transition-colors">
-            GameSeed<span className="text-primary/50">.</span>
-          </button>
-          <div className="text-sm font-bold text-muted-foreground border-l border-border pl-6">글쓰기</div>
+    <header className="bg-card/50 backdrop-blur-sm border-b border-border transition-colors">
+      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center">
+        {/* ⭐ 이모지 제거 및 심플 텍스트 유지 */}
+        <div className="text-lg font-extrabold text-foreground">
+          새 글 작성
         </div>
       </div>
     </header>
@@ -303,7 +283,7 @@ function Header() {
 }
 
 /* ------------------------------------------------
-   TOOLBAR COMPONENT (Dark Mode)
+   TOOLBAR COMPONENT
 ------------------------------------------------ */
 function Toolbar({ exec, uploadFileToStorage, previewOpen, setPreviewOpen, deleteSelectedImage }: any) {
   const [showImagePopup, setShowImagePopup] = useState(false);
@@ -362,11 +342,11 @@ function Toolbar({ exec, uploadFileToStorage, previewOpen, setPreviewOpen, delet
 
         <div className="relative">
           <button
-            className={`p-2 rounded hover:bg-accent transition-colors text-muted-foreground ${showImagePopup ? "bg-accent text-primary" : ""}`}
+            className={`p-2 rounded hover:bg-accent transition-colors text-muted-foreground text-sm font-medium ${showImagePopup ? "bg-accent text-primary" : ""}`}
             title="이미지 추가"
             onClick={() => setShowImagePopup(!showImagePopup)}
           >
-            🖼 사진
+            사진
           </button>
 
           {showImagePopup && (
@@ -376,9 +356,9 @@ function Toolbar({ exec, uploadFileToStorage, previewOpen, setPreviewOpen, delet
               <button
                 onClick={handleFileUpload}
                 disabled={isUploading}
-                className="w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm font-bold mb-3"
+                className="w-full flex items-center justify-center py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm font-bold mb-3"
               >
-                {isUploading ? "업로드 중..." : "📂 내 PC에서 업로드"}
+                {isUploading ? "업로드 중..." : "내 PC에서 업로드"}
               </button>
 
               <div className="relative flex py-2 items-center">
@@ -407,7 +387,6 @@ function Toolbar({ exec, uploadFileToStorage, previewOpen, setPreviewOpen, delet
           )}
         </div>
 
-        <ToolButton icon="🗑" label="선택 삭제" onClick={deleteSelectedImage} />
 
         <button
           className="ml-auto px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
@@ -424,7 +403,7 @@ function ToolButton({ icon, label, onClick, bold, italic, underline, strike }: a
   return (
     <button
       className={`
-        p-2 min-w-[32px] rounded hover:bg-accent transition-colors text-muted-foreground flex items-center justify-center
+        p-2 min-w-[32px] rounded hover:bg-accent transition-colors text-muted-foreground flex items-center justify-center text-sm font-medium
         ${bold ? "font-bold" : ""}
         ${italic ? "italic" : ""}
         ${underline ? "underline" : ""}

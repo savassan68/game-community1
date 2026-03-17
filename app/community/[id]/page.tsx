@@ -71,6 +71,9 @@ export default function DetailPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const [toastMsg, setToastMsg] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
   const viewUpdated = useRef(false);
 
   useEffect(() => {
@@ -100,19 +103,25 @@ export default function DetailPage() {
     await supabase.rpc("increase_views", { post_id: Number(id) });
   };
 
+  const triggerToast = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 2500);
+  };
+
+  // ⭐ 이모지 제거됨
   const handleLike = async () => {
-    if (!currentUserId) return alert("로그인이 필요합니다.");
+    if (!currentUserId) return triggerToast("로그인이 필요합니다.");
     const { data, error } = await supabase.rpc("toggle_like", { p_post_id: Number(id), p_user_id: currentUserId });
-    if (error) return alert("오류가 발생했습니다.");
-    alert(data === false ? "추천을 취소했습니다." : "추천했습니다!");
+    if (error) return triggerToast("오류가 발생했습니다.");
+    triggerToast(data === false ? "추천을 취소했습니다." : "추천했습니다.");
     fetchPost(); 
   };
 
-  // ⭐ 1. 공유 기능 핸들러
   const handleShare = async () => {
-    const currentUrl = window.location.href; // 현재 접속 중인 주소 가져오기
-    
-    // 모바일 등 Web Share API를 지원하는 환경 (네이티브 공유창 띄우기)
+    const currentUrl = window.location.href;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -121,36 +130,38 @@ export default function DetailPage() {
           url: currentUrl,
         });
       } catch (error) {
-        console.log("공유가 취소되었거나 지원하지 않습니다.", error);
+        console.log("공유 취소", error);
       }
     } else {
-      // PC 등 Web Share API 미지원 환경 (클립보드에 주소 복사)
       try {
         await navigator.clipboard.writeText(currentUrl);
-        alert("게시글 주소가 클립보드에 복사되었습니다! 원하는 곳에 붙여넣기 하세요.");
+        triggerToast("게시글 주소가 복사되었습니다.");
       } catch (error) {
-        alert("주소 복사에 실패했습니다.");
+        triggerToast("주소 복사에 실패했습니다.");
       }
     }
   };
 
   const handleScrap = async () => {
-    if (!currentUserId) return alert("로그인이 필요합니다.");
-    alert("게시글이 스크랩 되었습니다. (마이페이지에서 확인 가능)");
+    if (!currentUserId) return triggerToast("로그인이 필요합니다.");
+    triggerToast("게시글이 스크랩 되었습니다.");
   };
 
   const handleReport = async () => {
-    if (!currentUserId) return alert("로그인이 필요합니다.");
+    if (!currentUserId) return triggerToast("로그인이 필요합니다.");
     const confirmed = confirm("이 게시글을 신고하시겠습니까? 허위 신고 시 제재를 받을 수 있습니다.");
     if (confirmed) {
-      alert("신고가 정상적으로 접수되었습니다.");
+      triggerToast("신고가 정상적으로 접수되었습니다.");
     }
   };
 
   const deletePost = async () => {
     if (!confirm("정말 이 글을 삭제하시겠습니까?")) return;
     const { error } = await supabase.from("community").delete().eq("id", id);
-    if (!error) { alert("삭제되었습니다."); router.push("/community"); }
+    if (!error) { 
+      alert("삭제되었습니다."); 
+      router.push("/community"); 
+    }
   };
 
   useEffect(() => {
@@ -178,7 +189,16 @@ export default function DetailPage() {
   const isAuthor = currentUserId && (post.user_id === currentUserId || post.author === user?.email);
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 relative overflow-hidden">
+      
+      <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 pointer-events-none ${
+        showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}>
+        <div className="bg-slate-800 text-white px-5 py-3 rounded-full shadow-2xl text-sm font-bold flex items-center gap-2 whitespace-nowrap">
+          {toastMsg}
+        </div>
+      </div>
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         
         <div className="flex justify-between items-center mb-6">
@@ -228,8 +248,6 @@ export default function DetailPage() {
                   </div>
                 </div>
               </div>
-              
-              {/* 상단에 있던 공유 버튼 삭제됨 */}
             </div>
           </div>
 
@@ -240,10 +258,8 @@ export default function DetailPage() {
             />
           </div>
 
-          {/* ⭐ 하단 액션 버튼 영역 (추천, 공유, 스크랩, 신고) */}
           <div className="py-10 flex flex-col items-center justify-center border-t border-border bg-muted/20">
              
-             {/* 1. 메인 추천 버튼 */}
              <button 
                onClick={handleLike}
                className="group flex flex-col items-center gap-2 px-8 py-3 bg-card border border-border rounded-2xl shadow-sm hover:shadow-md hover:border-rose-500/50 transition-all active:scale-95"
@@ -256,10 +272,8 @@ export default function DetailPage() {
                </span>
              </button>
 
-             {/* 2. 서브 액션 버튼들 (공유, 스크랩, 신고) */}
              <div className="flex items-center gap-4 sm:gap-6 mt-6">
                
-               {/* 공유는 누구나 가능하도록 바깥으로 뺌 */}
                <button 
                  onClick={handleShare}
                  className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
@@ -267,11 +281,9 @@ export default function DetailPage() {
                  <Icons.Share /> 공유
                </button>
                
-               {/* 스크랩과 신고는 로그인한 유저만 보이게 처리 */}
                {currentUserId && (
                  <>
-                   <div className="w-px h-3 bg-border"></div> {/* 구분선 */}
-
+                   <div className="w-px h-3 bg-border"></div>
                    <button 
                      onClick={handleScrap}
                      className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
@@ -279,8 +291,7 @@ export default function DetailPage() {
                      <Icons.Bookmark /> 스크랩
                    </button>
                    
-                   <div className="w-px h-3 bg-border"></div> {/* 구분선 */}
-
+                   <div className="w-px h-3 bg-border"></div>
                    <button 
                      onClick={handleReport}
                      className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"
@@ -289,12 +300,10 @@ export default function DetailPage() {
                    </button>
                  </>
                )}
-
              </div>
           </div>
         </article>
 
-        {/* 🔹 댓글 영역 */}
         <div className="mt-8">
            <div className="bg-card rounded-2xl shadow-sm border border-border p-6 sm:p-8 transition-colors">
              <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">

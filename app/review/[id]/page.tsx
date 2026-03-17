@@ -8,10 +8,13 @@ import { GAME_CATEGORIES } from "@/lib/constants";
 const Icons = {
   ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
-  Heart: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+  Heart: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
+  // ⭐ 시계(플레이 타임) 아이콘 추가
+  Clock: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 };
 
-type Review = { id: number; content: string; rating: number; author: string; user_id: string | null; created_at: string; game_id?: number; likes?: number; };
+// ⭐ Review 타입에 playtime 추가
+type Review = { id: number; content: string; rating: number; author: string; user_id: string | null; created_at: string; game_id?: number; likes?: number; playtime?: number; };
 type Game = { id: number; title: string; description: string; image_url: string; categories: string[]; metacritic_score?: number; opencritic_score?: number; };
 type CriticReview = { id: number; outlet: string; author: string; rating: number; content: string; url: string; };
 
@@ -24,6 +27,9 @@ export default function GameDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [criticReviews, setCriticReviews] = useState<CriticReview[]>([]);
   const [user, setUser] = useState<any>(null);
+  
+  // ⭐ 현재 로그인한 유저의 이 게임 플레이 시간 (스팀 연동 데이터)
+  const [userPlaytime, setUserPlaytime] = useState<number | null>(null);
 
   const [myReview, setMyReview] = useState("");
   const [myRating, setMyRating] = useState(80);
@@ -57,6 +63,17 @@ export default function GameDetailPage() {
           image_url: gameData.image_url || "",
           categories: gameData.categories ? gameData.categories.join(", ") : "",
         });
+
+        // ⭐[여기서부터 복사해서 딱 끼워넣어 주세요!] ⭐
+        const savedGames = JSON.parse(localStorage.getItem("recentGames") || "[]");
+        const newGame = { id: gameData.id, title: gameData.title, url: `/review/${gameData.id}` };
+        
+        const filteredGames = savedGames.filter((g: any) => g.id !== gameData.id);
+        const updatedGames = [newGame, ...filteredGames].slice(0, 5);
+        
+        localStorage.setItem("recentGames", JSON.stringify(updatedGames));
+        window.dispatchEvent(new Event("recentGamesUpdated"));
+        // ⭐ [여기까지 추가!] ⭐
       }
 
       const { data: reviewData } = await supabase.from("reviews").select("*").eq("game_id", gameId).order("created_at", { ascending: false });
@@ -70,6 +87,22 @@ export default function GameDetailPage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
+      
+      // ⭐ 스팀 연동 플레이 시간 가져오기 로직
+      if (session?.user && gameData) {
+        // user_owned_games 테이블에서 현재 접속한 게임 제목과 일치하는 내역이 있는지 검색합니다.
+        const { data: ownedGame } = await supabase
+          .from("user_owned_games")
+          .select("playtime_forever")
+          .eq("user_id", session.user.id)
+          .ilike("game_title", `%${gameData.title}%`) // 제목으로 매칭
+          .maybeSingle();
+        
+        if (ownedGame) {
+          setUserPlaytime(ownedGame.playtime_forever);
+        }
+      }
+
       setLoading(false);
     };
     fetchData();
@@ -91,7 +124,18 @@ export default function GameDetailPage() {
   const handleSubmitReview = async () => {
     if (!user) return alert("로그인이 필요합니다.");
     if (!myReview.trim()) return alert("내용을 입력해주세요.");
-    const { error } = await supabase.from("reviews").insert({ game_id: gameId, content: myReview, rating: myRating, author: user.email, user_id: user.id, created_at: new Date().toISOString() });
+    
+    // ⭐ 리뷰 등록 시 DB에 playtime을 함께 전송합니다.
+    const { error } = await supabase.from("reviews").insert({ 
+      game_id: gameId, 
+      content: myReview, 
+      rating: myRating, 
+      author: user.email, 
+      user_id: user.id, 
+      playtime: userPlaytime || 0, // 스팀 데이터가 없으면 0으로 저장
+      created_at: new Date().toISOString() 
+    });
+    
     if (error) alert("등록 실패: " + error.message); else window.location.reload();
   };
 
@@ -136,7 +180,6 @@ export default function GameDetailPage() {
   if (loading || !game) return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground font-bold transition-colors">로딩 중...</div>;
 
   return (
-    // ⭐ [수정] bg-slate-50 -> bg-background
     <div className="min-h-screen bg-background text-foreground pb-20 transition-colors duration-300">
       <main className="max-w-5xl mx-auto px-4 sm:px-6 mt-8">
         
@@ -144,11 +187,10 @@ export default function GameDetailPage() {
           <Icons.ChevronLeft /> 목록으로
         </button>
 
-        {/* 🎮 게임 기본 정보 섹션 */}
+        {/* 🎮 게임 기본 정보 섹션 (기존과 동일) */}
         <section className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden mb-12 flex flex-col md:flex-row relative transition-colors">
-          
           {isEditing ? (
-            <div className="p-8 w-full flex flex-col gap-4">
+             <div className="p-8 w-full flex flex-col gap-4">
               <input type="text" value={editForm.image_url} onChange={(e) => setEditForm({...editForm, image_url: e.target.value})} className="p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="이미지 URL" />
               <input value={editForm.title} onChange={(e) => setEditForm({...editForm, title: e.target.value})} className="text-2xl font-bold p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="게임 제목" />
               <textarea value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} className="h-32 p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="게임 설명" />
@@ -166,12 +208,10 @@ export default function GameDetailPage() {
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold">이미지 없음</div>
                 )}
-                {/* 다크 모드에서는 그라데이션을 더 어둡게 처리 */}
                 <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/80 md:from-transparent to-transparent"></div>
               </div>
 
               <div className="p-8 flex-1 flex flex-col justify-center relative z-10 -mt-20 md:mt-0 bg-card md:bg-transparent rounded-t-3xl md:rounded-none">
-                
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {game.categories?.map((c) => (
                     <span key={c} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-extrabold tracking-wider border border-primary/20">
@@ -179,29 +219,22 @@ export default function GameDetailPage() {
                     </span>
                   ))}
                 </div>
-
                 <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight mb-4">{game.title}</h1>
                 <p className="text-muted-foreground text-sm leading-relaxed mb-8 line-clamp-4">{game.description}</p>
-
                 <div className="flex gap-4 mb-4">
                   {game.opencritic_score && game.opencritic_score > 0 && (
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">OpenCritic</span>
-                      <span className={`text-xl font-black ${getScoreTextColor(game.opencritic_score)}`}>
-                        {game.opencritic_score}
-                      </span>
+                      <span className={`text-xl font-black ${getScoreTextColor(game.opencritic_score)}`}>{game.opencritic_score}</span>
                     </div>
                   )}
                   {game.metacritic_score && game.metacritic_score > 0 && (
                     <div className={`flex flex-col ${game.opencritic_score && game.opencritic_score > 0 ? "pl-4 border-l border-border" : ""}`}>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Metacritic</span>
-                      <span className={`text-xl font-black ${getScoreTextColor(game.metacritic_score)}`}>
-                        {game.metacritic_score}
-                      </span>
+                      <span className={`text-xl font-black ${getScoreTextColor(game.metacritic_score)}`}>{game.metacritic_score}</span>
                     </div>
                   )}
                 </div>
-
                 {user && (
                   <div className="absolute top-4 right-4 md:top-6 md:right-6">
                     <button onClick={() => setIsEditing(true)} className="p-2 text-muted-foreground hover:text-primary transition-colors bg-card rounded-full shadow-sm hover:shadow-md border border-border" title="게임 정보 수정">
@@ -221,9 +254,18 @@ export default function GameDetailPage() {
             
             <section className="bg-card p-6 rounded-3xl border border-border shadow-sm relative overflow-hidden group transition-colors">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-purple-500"></div>
-              <h2 className="text-lg font-black text-foreground mb-5">
-                이 게임, 어떠셨나요?
-              </h2>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-black text-foreground">
+                  이 게임, 어떠셨나요?
+                </h2>
+                
+                {/* ⭐ 스팀 연동 플레이 타임 감지 안내 뱃지 */}
+                {userPlaytime !== null && userPlaytime > 0 && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#171a21]/10 dark:bg-[#1b2838]/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg border border-indigo-500/20">
+                    <Icons.Clock /> 스팀 플레이 {(userPlaytime / 60).toFixed(1)}시간 인증됨
+                  </div>
+                )}
+              </div>
 
               {user ? (
                 <div className="space-y-4">
@@ -243,7 +285,10 @@ export default function GameDetailPage() {
 
                   <textarea value={myReview} onChange={(e) => setMyReview(e.target.value)} className="w-full h-28 border border-border bg-muted/30 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card transition-all text-sm resize-none text-foreground placeholder:text-muted-foreground" placeholder="이 게임에 대한 솔직한 평가를 남겨주세요..." />
                   
-                  <div className="flex justify-end">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-muted-foreground font-medium pl-2">
+                      {userPlaytime !== null ? "* 작성 시 플레이 타임이 함께 등록됩니다." : "* 마이페이지에서 스팀을 연동하면 플레이 타임을 인증할 수 있습니다."}
+                    </span>
                     <button onClick={handleSubmitReview} className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-md hover:opacity-90 active:scale-95 transition-all">
                       리뷰 등록하기
                     </button>
@@ -284,8 +329,16 @@ export default function GameDetailPage() {
                         <div className="flex-1 min-w-0 pt-1">
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <div className="font-extrabold text-sm text-foreground">{r.author?.split("@")[0] ?? "익명"}</div>
-                              <div className="text-[11px] font-medium text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-sm text-foreground">{r.author?.split("@")[0] ?? "익명"}</span>
+                                {/* ⭐ 개별 리뷰에 달리는 플레이 타임 인증 뱃지 */}
+                                {r.playtime !== undefined && r.playtime > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-md border border-indigo-500/20">
+                                    <Icons.Clock /> {(r.playtime / 60).toFixed(1)}시간
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] font-medium text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleDateString()}</div>
                             </div>
                             
                             <div className="flex items-center gap-3">
@@ -314,8 +367,9 @@ export default function GameDetailPage() {
             </section>
           </div>
 
-          {/* 📡 외부(Steam) 및 전문가 평론 섹션 */}
+          {/* 📡 외부(Steam) 및 전문가 평론 섹션 (기존 코드 유지) */}
           <aside className="lg:col-span-5 space-y-8">
+            {/* ...(생략 없이 기존과 동일하게 들어있습니다. 복사하시면 그대로 적용됩니다!) ... */}
             
             <div className="bg-card rounded-3xl border border-border p-6 shadow-sm transition-colors">
               <div className="flex items-center gap-2 mb-5 pb-4 border-b border-border">
@@ -354,7 +408,6 @@ export default function GameDetailPage() {
             </div>
 
             {criticReviews.length > 0 && (
-              // 전문가 평론 영역: 다크 모드에선 bg-card/bg-muted 조합으로 변경 (너무 새까만색 방지)
               <div className="bg-slate-900 dark:bg-slate-950 rounded-3xl border border-border p-6 shadow-lg text-white transition-colors">
                 <div className="flex items-center gap-2 mb-5 pb-4 border-b border-slate-700">
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>

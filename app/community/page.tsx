@@ -151,6 +151,47 @@ export default function CommunityPage() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        
+        {/* ⭐ [추가됨] 모바일에서만 최상단에 보이는 심플한 인기글 섹션 */}
+        <div className="lg:hidden mb-8">
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm transition-colors">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+              <h3 className="font-bold text-foreground text-sm">실시간 인기글</h3>
+            </div>
+            <ul className="space-y-3">
+              {popularPosts.length > 0 ? popularPosts.map((post, idx) => (
+                <li 
+                  key={post.id} 
+                  onClick={() => router.push(`/community/${post.id}`)}
+                  className="flex gap-3 items-center cursor-pointer group"
+                >
+                  <div className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-[10px] font-bold ${
+                    idx < 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="text-primary text-[10px] font-bold whitespace-nowrap">
+                      [{getCategoryLabel(post.category)}]
+                    </span>
+                    <p className="text-sm font-medium text-foreground group-hover:text-primary truncate transition-colors">
+                      {post.title}
+                    </p>
+                    {post.comment_count > 0 && (
+                      <span className="text-[10px] font-extrabold text-rose-500 flex-shrink-0">
+                        [{post.comment_count}]
+                      </span>
+                    )}
+                  </div>
+                </li>
+              )) : (
+                <li className="text-xs text-muted-foreground py-2 text-center">아직 인기글이 없습니다.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           <div className="lg:col-span-8">
@@ -300,7 +341,7 @@ export default function CommunityPage() {
               </div>
             )}
 
-            <div className="flex justify-center items-center gap-2 mt-4">
+            <div className="flex justify-center items-center gap-2 mt-4 mb-8 lg:mb-0">
               <div className="flex bg-card border border-border rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden">
                 <select 
                   value={searchType} 
@@ -327,10 +368,10 @@ export default function CommunityPage() {
             </div>
           </div>
 
-<aside className="lg:col-span-4 space-y-6">
+          <aside className="lg:col-span-4 space-y-6">
             
-            {/* 1. 실시간 인기글 섹션 (위로 이동) */}
-            <div className="bg-card rounded-2xl border border-border p-5 shadow-sm transition-colors">
+            {/* ⭐ [수정됨] PC에서만 보이는 기존 상세 인기글 섹션 */}
+            <div className="hidden lg:block bg-card rounded-2xl border border-border p-5 shadow-sm transition-colors">
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
                 <h3 className="font-bold text-foreground text-sm">실시간 인기글</h3>
               </div>
@@ -374,10 +415,9 @@ export default function CommunityPage() {
               </ul>
             </div>
 
-            {/* ⭐ 2. 스크롤 따라다니는 영역 (sticky) */}
+            {/* 스크롤 따라다니는 영역 (sticky) */}
             <div className="sticky top-24 space-y-6 hidden lg:block">
               
-              {/* PC용 글쓰기 버튼 (스크롤 고정) */}
               <button 
                 onClick={() => router.push("/community/write")}
                 className="w-full py-3.5 bg-primary text-primary-foreground rounded-2xl font-bold text-sm shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -385,7 +425,6 @@ export default function CommunityPage() {
                 <Icons.Edit /> 새 글 작성하기
               </button>
 
-              {/* 하단 푸터 (버튼 아래에 위치) */}
               <footer className="text-xs text-muted-foreground px-2 text-center">
                 <p>© 2026 GameSeed Inc.</p>
                 <div className="flex justify-center gap-2 mt-1 opacity-70">

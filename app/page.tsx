@@ -17,7 +17,6 @@ type Review = { id: number; game_id?: number; title: string; content: string; ra
 type Community = { id: number; title: string; likes?: number; author_name?: string; created_at?: string; comment_count?: number; };
 type NewsPost = { id: string; title: string; summary: string; category?: string; image_url?: string; created_at?: string; };
 
-// ⭐ 배너용 게임 타입 추가
 type TopGame = { id: number; title: string; image_url?: string; metacritic_score?: number; opencritic_score?: number; };
 
 const NEWS_CATEGORIES = [
@@ -34,7 +33,6 @@ const getNewsCategoryLabel = (catId: string) => {
   return found ? found.label : catId;
 };
 
-// 디자인 확인용 더미 뉴스
 const DUMMY_NEWS: NewsPost[] = [
   { id: "1", title: "GameSeed 뉴스 서비스, 다음 달 공식 오픈 예정!", summary: "유저분들의 많은 요청이 있었던 게임 뉴스 탭이 드디어 추가됩니다. 빠른 소식을 기대해주세요.", category: "industry", created_at: new Date().toISOString() },
   { id: "2", title: "글로벌 eSports 대회, 한국 팀 결승 진출 확정", summary: "세계 최대 규모의 대회에서 한국 대표팀이 압도적인 기량으로 결승에 올랐습니다. 우승 트로피를 차지할 수 있을까요?", category: "esports", created_at: new Date().toISOString() },
@@ -46,7 +44,7 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
 
-  const [topGames, setTopGames] = useState<TopGame[]>([]); // ⭐ 배너 게임 상태
+  const [topGames, setTopGames] = useState<TopGame[]>([]);
   const [latestReviews, setLatestReviews] = useState<Review[]>([]);
   const [topReviews, setTopReviews] = useState<Review[]>([]);
   const [latestCommunity, setLatestCommunity] = useState<Community[]>([]);
@@ -72,23 +70,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const load = async () => {
-      // ⭐ 1. 배너용 게임 데이터: 일단 이미지가 있는 게임을 넉넉히(20개) 불러옵니다.
       const gamesRes = await supabase.from("games")
         .select("id, title, image_url, metacritic_score, opencritic_score")
         .not("image_url", "is", null)
         .limit(20);
         
       if (!gamesRes.error && gamesRes.data) {
-        // ⭐ 2. 가져온 데이터 중 "점수가 0보다 큰 것"만 걸러내고, 높은 순으로 정렬해서 4개만 딱 자릅니다!
         const sortedGames = gamesRes.data
           .filter(g => (g.metacritic_score && g.metacritic_score > 0) || (g.opencritic_score && g.opencritic_score > 0))
           .sort((a, b) => {
-             // 메타크리틱과 오픈크리틱 중 존재하는 더 높은 점수를 기준으로 비교
              const scoreA = Math.max(a.metacritic_score || 0, a.opencritic_score || 0);
              const scoreB = Math.max(b.metacritic_score || 0, b.opencritic_score || 0);
-             return scoreB - scoreA; // 내림차순 (점수 높은 게 위로)
+             return scoreB - scoreA;
           })
-          .slice(0, 4); // 딱 4개만 가져오기
+          .slice(0, 4);
           
         setTopGames(sortedGames);
       }
@@ -147,18 +142,16 @@ export default function HomePage() {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* ⭐ 새로운 게임 배너 영역 */}
         <section className="mb-10">
-          <div className="flex items-center gap-2 mb-5 px-1">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-              <Icons.Gamepad />
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <div className="scale-90"><Icons.Gamepad /></div>
             </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">이번 주 인기 게임</h2>
+            <h2 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight">이번 주 인기 게임</h2>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-4 sm:pb-0 snap-x snap-mandatory scrollbar-hide">
             {topGames.length > 0 ? topGames.map((game) => {
-              // 오픈크리틱 점수 우선, 없으면 메타크리틱 점수 사용
               const score = (game.opencritic_score && game.opencritic_score > 0) 
                 ? game.opencritic_score 
                 : game.metacritic_score;
@@ -167,9 +160,8 @@ export default function HomePage() {
                 <div
                   key={game.id}
                   onClick={() => router.push(`/review/${game.id}`)}
-                  className="group relative h-48 sm:h-56 lg:h-64 rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border bg-card"
+                  className="flex-shrink-0 w-[75vw] sm:w-auto snap-center group relative h-44 sm:h-48 lg:h-52 rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border bg-card"
                 >
-                  {/* 게임 썸네일 */}
                   {game.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={game.image_url} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -177,10 +169,8 @@ export default function HomePage() {
                     <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground"><Icons.Image /></div>
                   )}
                   
-                  {/* 어두운 그라데이션 오버레이 (글씨 가독성 확보) */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-                  {/* 점수 뱃지 (리뷰 페이지와 동일한 색상 로직) */}
                   {score && score > 0 && (
                     <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-black shadow-lg backdrop-blur-md bg-opacity-90 border transition-transform group-hover:scale-105 ${
                       score >= 80 ? 'bg-emerald-500/90 text-white border-emerald-400' : 
@@ -191,31 +181,26 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* 게임 제목 */}
                   <div className="absolute bottom-0 left-0 p-4 w-full translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
-                    <h3 className="text-white font-extrabold text-lg sm:text-xl line-clamp-2 drop-shadow-md">
+                    <h3 className="text-white font-extrabold text-base sm:text-lg line-clamp-2 drop-shadow-md">
                       {game.title}
                     </h3>
                   </div>
                 </div>
               );
             }) : (
-              // 게임 데이터가 로딩 중이거나 없을 때 스켈레톤 UI 표시
               Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-48 sm:h-56 lg:h-64 rounded-2xl bg-muted animate-pulse border border-border"></div>
+                <div key={i} className="flex-shrink-0 w-[75vw] sm:w-auto snap-center h-44 sm:h-48 lg:h-52 rounded-2xl bg-muted animate-pulse border border-border"></div>
               ))
             )}
           </div>
         </section>
 
-        {/* 좌/우 단 분리 레이아웃 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* 🟢 왼쪽 단 (뉴스 & 평론 영역) */}
           <div className="lg:col-span-8 flex flex-col gap-6 w-full">
             
-            {/* 1. 최신 게임 뉴스 */}
-            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm flex flex-col transition-colors">
+            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm flex flex-col transition-colors order-1 lg:order-2">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/news")} className="font-bold text-card-foreground text-sm hover:text-primary transition-colors flex items-center gap-1">
                   최신 게임 뉴스 <Icons.ChevronRight />
@@ -279,8 +264,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 2. 인기 평론 */}
-            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors">
+            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors order-2 lg:order-1">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-card-foreground text-sm hover:text-primary transition-colors flex items-center gap-1">
                   이번 주 인기 평론 <Icons.ChevronRight />
@@ -293,7 +277,8 @@ export default function HomePage() {
                       <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 truncate max-w-[150px]">
                         {r.games?.title || "알 수 없는 게임"}
                       </span>
-                      <span className="flex items-center gap-1 text-xs font-bold text-destructive"><Icons.Heart /> {r.likes ?? 0}</span>
+                      {/* ⭐ 하트 색상 변경: text-destructive -> text-primary */}
+                      <span className="flex items-center gap-1 text-xs font-bold text-primary"><Icons.Heart /> {r.likes ?? 0}</span>
                     </div>
                     <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">{r.title}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{r.content}</p>
@@ -302,8 +287,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 3. 최신 유저 평론 */}
-            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors">
+            <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors order-3 lg:order-3">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-card-foreground text-sm hover:text-primary transition-colors flex items-center gap-1">
                   최신 유저 평론 <Icons.ChevronRight />
@@ -329,10 +313,8 @@ export default function HomePage() {
             </section>
           </div>
 
-          {/* 🟢 오른쪽 단 (커뮤니티 영역) */}
           <div className="lg:col-span-4 flex flex-col gap-6 w-full">
             
-            {/* 1. 실시간 인기 커뮤니티 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-card-foreground text-sm hover:text-primary transition-colors flex items-center gap-1">
@@ -343,7 +325,7 @@ export default function HomePage() {
                 {topCommunity.length > 0 ? topCommunity.map((p, idx) => (
                   <li key={p.id} onClick={() => router.push(`/community/${p.id}`)} className="py-3.5 flex items-center justify-between gap-3 cursor-pointer group px-1">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-xs font-bold ${idx < 3 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
+                      <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-xs font-bold ${idx < 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {idx + 1}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -365,7 +347,6 @@ export default function HomePage() {
               </ul>
             </section>
 
-            {/* 2. 최근 커뮤니티 글 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm transition-colors">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-card-foreground text-sm hover:text-primary transition-colors flex items-center gap-1">
