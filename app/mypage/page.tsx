@@ -293,6 +293,17 @@ function MyPageContent() {
 
       if (insertError) throw insertError;
 
+      // ⭐ 3. 여기에 '알림 전송' 스위치를 추가합니다! ⭐
+      // ==========================================
+      await supabase.from("notifications").insert({
+        user_id: receiverData.id, // 알림을 받을 사람 (쪽지 받는 사람)
+        type: "message",
+        actor_nickname: profile?.nickname || "익명", // 알림을 보낸 사람
+        message: "새로운 쪽지를 보냈습니다.",
+        link: "/mypage?tab=messages", // 알림 클릭 시 이동할 주소
+      });
+      // ==========================================
+
       alert("쪽지를 성공적으로 보냈습니다! ✈️");
       setShowMessageModal(false);
       setMessageReceiver("");

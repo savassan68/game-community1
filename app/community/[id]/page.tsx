@@ -8,7 +8,7 @@ import CommentList from "../../components/CommentList";
 
 const Icons = {
   Heart: ({ filled }: { filled?: boolean }) => (
-    <svg className={`w-5 h-5 transition-colors ${filled ? "text-rose-500 fill-rose-500" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className={`w-5 h-5 transition-colors ${filled ? "text-primary fill-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
     </svg>
   ),
@@ -59,7 +59,7 @@ function timeAgo(dateString?: string) {
 const getCategoryLabel = (cat?: string) => {
   const map: Record<string, string> = { strategy: "공략", humor: "유머", question: "질문", free: "자유" };
   return map[cat || "free"] || "자유";
-};
+}
 
 export default function DetailPage() {
   const { id } = useParams();
@@ -68,6 +68,7 @@ export default function DetailPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserNickname, setCurrentUserNickname] = useState<string>("익명");
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -81,6 +82,15 @@ export default function DetailPage() {
       const { data } = await supabase.auth.getSession();
       setUser(data.session?.user ?? null);
       setCurrentUserId(data.session?.user?.id || null);
+
+      if (data.session?.user?.id) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("nickname")
+          .eq("id", data.session.user.id)
+          .single();
+        if (profile) setCurrentUserNickname(profile.nickname);
+      }
     };
     checkAuth();
   }, []);
@@ -111,12 +121,24 @@ export default function DetailPage() {
     }, 2500);
   };
 
-  // ⭐ 이모지 제거됨
   const handleLike = async () => {
     if (!currentUserId) return triggerToast("로그인이 필요합니다.");
     const { data, error } = await supabase.rpc("toggle_like", { p_post_id: Number(id), p_user_id: currentUserId });
     if (error) return triggerToast("오류가 발생했습니다.");
-    triggerToast(data === false ? "추천을 취소했습니다." : "추천했습니다.");
+    
+    const isLiked = data !== false;
+    triggerToast(isLiked ? "추천했습니다." : "추천을 취소했습니다.");
+
+    if (isLiked && post?.user_id && post.user_id !== currentUserId) {
+      await supabase.from("notifications").insert({
+        user_id: post.user_id,
+        type: "like",
+        actor_nickname: currentUserNickname,
+        message: `회원님의 게시글을 추천했습니다.`,
+        link: `/community/${id}`,
+      });
+    }
+
     fetchPost(); 
   };
 
@@ -144,7 +166,21 @@ export default function DetailPage() {
 
   const handleScrap = async () => {
     if (!currentUserId) return triggerToast("로그인이 필요합니다.");
-    triggerToast("게시글이 스크랩 되었습니다.");
+    
+    const { error } = await supabase.from("scraps").insert({
+      user_id: currentUserId,
+      post_id: Number(id)
+    });
+
+    if (error) {
+      if (error.code === '23505') { 
+        triggerToast("이미 스크랩한 게시글입니다.");
+      } else {
+        triggerToast("오류가 발생했습니다.");
+      }
+    } else {
+      triggerToast("게시글이 스크랩 되었습니다. (마이페이지 확인)");
+    }
   };
 
   const handleReport = async () => {
@@ -164,6 +200,11 @@ export default function DetailPage() {
     }
   };
 
+  // ⭐ 중복 알림 로직을 지우고, 댓글 목록 새로고침만 남겼습니다!
+  const handleCommentAdded = () => {
+    fetchComments();
+  };
+
   useEffect(() => {
     if (id && !viewUpdated.current) {
       viewUpdated.current = true;
@@ -171,6 +212,7 @@ export default function DetailPage() {
       fetchPost();
       fetchComments();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -262,12 +304,12 @@ export default function DetailPage() {
              
              <button 
                onClick={handleLike}
-               className="group flex flex-col items-center gap-2 px-8 py-3 bg-card border border-border rounded-2xl shadow-sm hover:shadow-md hover:border-rose-500/50 transition-all active:scale-95"
+               className="group flex flex-col items-center gap-2 px-8 py-3 bg-card border border-border rounded-2xl shadow-sm hover:shadow-md hover:border-primary/50 transition-all active:scale-95"
              >
-               <div className="p-2 rounded-full bg-muted group-hover:bg-rose-500/10 transition-colors">
+               <div className="p-2 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
                   <Icons.Heart filled={post.likes > 0} />
                </div>
-               <span className="text-sm font-bold text-muted-foreground group-hover:text-rose-500">
+               <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
                  추천 {post.likes}
                </span>
              </button>
@@ -311,7 +353,7 @@ export default function DetailPage() {
              </h3>
              
              <div className="mb-8">
-               <CommentForm postId={Number(id)} userId={currentUserId} onCommentAdded={fetchComments} />
+               <CommentForm postId={Number(id)} userId={currentUserId} onCommentAdded={handleCommentAdded} />
              </div>
 
              <div className="divide-y divide-border">

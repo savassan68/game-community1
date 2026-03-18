@@ -4,6 +4,11 @@ import { useState } from "react";
 import supabase from "@/lib/supabaseClient";
 import CommentForm from "./CommentForm"; 
 
+// ⭐ 대댓글용 꺾인 화살표 아이콘 추가
+const Icons = {
+  CornerDownRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4v11a2 2 0 002 2h10" /></svg>
+};
+
 interface Comment {
   id: number;
   post_id: number;
@@ -70,39 +75,45 @@ export default function CommentList({
 
   if (comments.length === 0)
     return (
-      <div className="py-8 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border transition-colors">
+      <div className="py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border transition-colors font-bold text-sm">
+        <div className="text-3xl mb-2 opacity-50">💬</div>
         첫 번째 댓글을 남겨보세요!
       </div>
     );
 
   const renderCommentItem = (c: Comment, isReply: boolean = false) => (
     <div className={`flex items-start gap-3 ${isReply ? "py-3" : "py-5"} group transition-colors`}>
-      {/* ⭐ 아바타 배경: bg-muted, 글자색: text-muted-foreground */}
-      <div className={`flex-shrink-0 rounded-full flex items-center justify-center font-bold border border-border transition-colors ${isReply ? "w-8 h-8 bg-primary/10 text-primary text-xs" : "w-10 h-10 bg-muted text-muted-foreground text-sm"}`}>
+      
+      {/* 아바타 영역 */}
+      <div className={`flex-shrink-0 rounded-full flex items-center justify-center font-bold border border-border shadow-sm transition-colors ${
+        isReply 
+        ? "w-8 h-8 bg-primary/10 text-primary text-xs" 
+        : "w-10 h-10 bg-muted text-muted-foreground text-sm"
+      }`}>
         {(c.nickname || "U").charAt(0).toUpperCase()}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="font-bold text-foreground text-sm">{c.nickname || "익명 사용자"}</span>
-          <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
+          <span className="font-extrabold text-foreground text-sm">{c.nickname || "익명 사용자"}</span>
+          <span className="text-xs font-bold text-muted-foreground">{timeAgo(c.created_at)}</span>
         </div>
 
         {editingId === c.id ? (
-          /* ⭐ 수정 모드 배경: bg-muted/50, 글자색: text-foreground */
-          <div className="mt-2 bg-muted/50 border border-border p-3 rounded-xl focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="mt-2 bg-background border border-primary/30 shadow-sm p-3 rounded-xl focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <textarea className="w-full bg-transparent text-sm text-foreground resize-none outline-none min-h-[60px]" value={editContent} onChange={(e) => setEditContent(e.target.value)} />
             <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-border">
               <button onClick={cancelEdit} className="px-3 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted rounded-lg transition-colors">취소</button>
-              <button onClick={() => submitEdit(c.id)} className="px-3 py-1.5 text-xs font-bold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-colors">저장</button>
+              <button onClick={() => submitEdit(c.id)} className="px-3 py-1.5 text-xs font-bold text-primary-foreground bg-primary shadow-sm hover:opacity-90 rounded-lg transition-colors">저장</button>
             </div>
           </div>
         ) : (
-          <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap mt-0.5">{c.content}</div>
+          <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap mt-0.5">{c.content}</div>
         )}
 
+        {/* 버튼 영역 */}
         {!editingId && (
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-3 mt-2.5">
             {!isReply && currentUserId && (
               <button onClick={() => setReplyingId(replyingId === c.id ? null : c.id)} className="text-[11px] font-bold text-muted-foreground hover:text-primary transition-colors">
                 {replyingId === c.id ? "답글 취소" : "답글 달기"}
@@ -117,8 +128,9 @@ export default function CommentList({
           </div>
         )}
 
+        {/* 답글 입력 폼 */}
         {replyingId === c.id && (
-          <div className="mt-2">
+          <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <CommentForm
               postId={postId}
               userId={currentUserId}
@@ -136,22 +148,29 @@ export default function CommentList({
   );
 
   return (
-    /* ⭐ 구분선: divide-border */
     <ul className="divide-y divide-border transition-colors">
       {parentComments.map((parent) => {
         const replies = childComments
           .filter((child) => child.parent_id === parent.id)
-          .sort((a, b) => a.id - b.id);
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         return (
           <li key={parent.id} className="relative">
             {renderCommentItem(parent, false)}
 
-            {/* ⭐ 대댓글 구분선: border-primary/20 로 부드럽게 처리 */}
+            {/* 대댓글 렌더링 영역 */}
             {replies.length > 0 && (
-              <ul className="ml-8 pl-4 border-l-2 border-primary/20 mt-1 mb-4 space-y-1">
+              <ul className="ml-5 sm:ml-12 mt-1 mb-4 space-y-1">
                 {replies.map((reply) => (
-                  <li key={reply.id}>{renderCommentItem(reply, true)}</li>
+                  <li key={reply.id} className="flex gap-2 sm:gap-3 items-start">
+                    {/* ⭐ 꺾인 화살표 아이콘 적용 */}
+                    <div className="mt-4 text-border flex-shrink-0">
+                      <Icons.CornerDownRight />
+                    </div>
+                    <div className="flex-1 min-w-0 bg-muted/30 rounded-2xl px-3 sm:px-4">
+                      {renderCommentItem(reply, true)}
+                    </div>
+                  </li>
                 ))}
               </ul>
             )}

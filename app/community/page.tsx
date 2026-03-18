@@ -116,7 +116,7 @@ export default function CommunityPage() {
   const popularPosts = [...posts]
     .filter((post) => new Date(post.created_at) >= oneDayAgo)
     .sort((a, b) => b.likes - a.likes)
-    .slice(0, 5);
+    .slice(0, 5); // 인기글 상위 5개
 
   const filteredPosts = [...posts]
     .filter((post) => {
@@ -150,23 +150,54 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* ⭐ 컨테이너 넓이를 줄여서 양옆에 광고가 들어갈 '여백'을 확보했습니다. (max-w-4xl) */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* ⭐ [추가됨] 모바일에서만 최상단에 보이는 심플한 인기글 섹션 */}
-        <div className="lg:hidden mb-8">
-          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm transition-colors">
+        {/* 상단 통합 컨트롤 영역 (카테고리 + 글쓰기 버튼) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          {/* 카테고리 탭 */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { setActiveCategory(cat.id); setCurrentPage(1); }}
+                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
+                  activeCategory === cat.id
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ⭐ 우측 글쓰기 버튼 (이제 모바일, PC 모두 게시판 상단 우측에 위치) */}
+          <button
+            onClick={() => router.push("/community/write")}
+            className="flex-shrink-0 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm shadow-sm hover:shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Icons.Edit /> 새 글 쓰기
+          </button>
+        </div>
+
+        {/* ⭐ 상단 실시간 인기글 박스 (가로형 리스트) */}
+        {popularPosts.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm mb-6 transition-colors">
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+              <Icons.Fire />
               <h3 className="font-bold text-foreground text-sm">실시간 인기글</h3>
             </div>
-            <ul className="space-y-3">
-              {popularPosts.length > 0 ? popularPosts.map((post, idx) => (
+            {/* 그리드로 배치하여 공간 활용도를 높였습니다. */}
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {popularPosts.map((post, idx) => (
                 <li 
                   key={post.id} 
                   onClick={() => router.push(`/community/${post.id}`)}
-                  className="flex gap-3 items-center cursor-pointer group"
+                  className="flex gap-3 items-center cursor-pointer group p-2 rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-[10px] font-bold ${
-                    idx < 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                  <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-xs font-black ${
+                    idx < 3 ? "bg-primary/10 text-primary border border-primary/20" : "bg-muted text-muted-foreground"
                   }`}>
                     {idx + 1}
                   </div>
@@ -185,257 +216,163 @@ export default function CommunityPage() {
                     )}
                   </div>
                 </li>
-              )) : (
-                <li className="text-xs text-muted-foreground py-2 text-center">아직 인기글이 없습니다.</li>
-              )}
+              ))}
             </ul>
           </div>
+        )}
+
+        {/* 게시글 목록 상단 필터바 */}
+        <div className="flex items-center justify-between mb-4 px-1">
+          <div className="text-sm text-muted-foreground font-medium">
+            총 <span className="font-bold text-foreground">{filteredPosts.length}</span>개의 글
+          </div>
+          <div className="flex gap-1 bg-secondary p-1 rounded-lg">
+            {[{k:"latest",l:"최신"}, {k:"likes",l:"인기"}, {k:"views",l:"조회"}].map(o => (
+              <button 
+                key={o.k} 
+                onClick={() => { setSort(o.k as any); setCurrentPage(1); }}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${sort === o.k ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          <div className="lg:col-span-8">
-            <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setCurrentPage(1); }}
-                  className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
-                    activeCategory === cat.id
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border"
-                  }`}
+        {/* 메인 게시글 리스트 영역 */}
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden mb-8 min-h-[500px] transition-colors">
+          {loading ? (
+            <div className="p-20 text-center animate-pulse text-muted-foreground font-bold">로딩 중...</div>
+          ) : currentPosts.length > 0 ? (
+            <ul className="divide-y divide-border">
+              {currentPosts.map((post) => (
+                <li 
+                  key={post.id} 
+                  onClick={() => router.push(`/community/${post.id}`)}
+                  className="group p-4 hover:bg-accent/50 transition-colors cursor-pointer flex items-center gap-4"
                 >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-5 px-1 lg:hidden">
-              <button
-                onClick={() => router.push("/community/write")}
-                className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                <Icons.Edit /> 새 글 쓰기
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between mb-4 px-1">
-              <div className="text-sm text-muted-foreground font-medium">
-                총 <span className="font-bold text-foreground">{filteredPosts.length}</span>개의 글
-              </div>
-              <div className="flex gap-1 bg-secondary p-1 rounded-lg">
-                {[{k:"latest",l:"최신"}, {k:"likes",l:"인기"}, {k:"views",l:"조회"}].map(o => (
-                  <button 
-                    key={o.k} 
-                    onClick={() => { setSort(o.k as any); setCurrentPage(1); }}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${sort === o.k ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {o.l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden mb-6 min-h-[500px] transition-colors">
-              {loading ? (
-                <div className="p-20 text-center animate-pulse text-muted-foreground">로딩 중...</div>
-              ) : currentPosts.length > 0 ? (
-                <ul className="divide-y divide-border">
-                  {currentPosts.map((post) => (
-                    <li 
-                      key={post.id} 
-                      onClick={() => router.push(`/community/${post.id}`)}
-                      className="group p-4 hover:bg-accent/50 transition-colors cursor-pointer flex items-center gap-4"
-                    >
-                      <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted border border-border transition-colors">
-                        {post.image_url ? (
-                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Icons.Image />
-                          </div>
-                        )}
+                  <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted border border-border transition-colors">
+                    {post.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Icons.Image />
                       </div>
+                    )}
+                  </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border ${getCategoryBadgeStyle(post.category)}`}>
-                            {getCategoryLabel(post.category)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">· {post.author} · {timeAgo(post.created_at)}</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                            {post.title}
-                          </h3>
-                          {post.comment_count > 0 && (
-                            <span className="text-[13px] font-extrabold text-rose-500 flex-shrink-0">
-                              [{post.comment_count}]
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex-shrink-0 flex items-center gap-3 text-xs font-medium text-muted-foreground ml-2">
-                        <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
-                           <Icons.Heart /> 
-                           <span>{post.likes}</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
-                           <Icons.Eye />
-                           <span>{post.views}</span>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="p-20 text-center text-muted-foreground">
-                  <div className="text-2xl mb-2">📂</div>
-                  게시글이 없습니다.
-                </div>
-              )}
-            </div>
-
-            {totalPages > 0 && (
-              <div className="flex justify-center items-center gap-2 mb-8">
-                <button
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed bg-card"
-                >
-                  <Icons.ChevronLeft />
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(number => Math.abs(currentPage - number) < 5 || number === 1 || number === totalPages)
-                    .map((number, idx, arr) => {
-                       const prev = arr[idx - 1];
-                       const showEllipsis = prev && number - prev > 1;
-                       return (
-                         <div key={number} className="flex items-center">
-                           {showEllipsis && <span className="px-1 text-muted-foreground text-xs">...</span>}
-                           <button
-                             onClick={() => paginate(number)}
-                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${
-                               currentPage === number
-                                 ? "bg-primary text-primary-foreground shadow-md scale-110"
-                                 : "bg-card text-foreground hover:bg-accent border border-transparent hover:border-border"
-                             }`}
-                           >
-                             {number}
-                           </button>
-                         </div>
-                       );
-                    })}
-                </div>
-                <button
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed bg-card text-sm font-medium"
-                >
-                  다음 <Icons.ChevronRight />
-                </button>
-              </div>
-            )}
-
-            <div className="flex justify-center items-center gap-2 mt-4 mb-8 lg:mb-0">
-              <div className="flex bg-card border border-border rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden">
-                <select 
-                  value={searchType} 
-                  onChange={(e) => setSearchType(e.target.value)}
-                  className="bg-muted border-r border-border text-xs font-bold px-3 py-2 outline-none text-foreground"
-                >
-                  <option value="title_content">제목+내용</option>
-                  <option value="title">제목</option>
-                  <option value="content">내용</option>
-                  <option value="nickname">닉네임</option>
-                </select>
-                <input 
-                  type="text" 
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="검색어 입력"
-                  className="px-4 py-2 text-sm outline-none w-48 sm:w-64 bg-transparent text-foreground"
-                />
-                <button onClick={handleSearch} className="px-4 bg-muted hover:bg-accent text-muted-foreground transition-colors">
-                  <Icons.Search />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <aside className="lg:col-span-4 space-y-6">
-            
-            {/* ⭐ [수정됨] PC에서만 보이는 기존 상세 인기글 섹션 */}
-            <div className="hidden lg:block bg-card rounded-2xl border border-border p-5 shadow-sm transition-colors">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                <h3 className="font-bold text-foreground text-sm">실시간 인기글</h3>
-              </div>
-              <ul className="space-y-4">
-                {popularPosts.length > 0 ? popularPosts.map((post, idx) => (
-                  <li 
-                    key={post.id} 
-                    onClick={() => router.push(`/community/${post.id}`)}
-                    className="flex gap-3 cursor-pointer group"
-                  >
-                    <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-xs font-bold ${
-                      idx < 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {idx + 1}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border ${getCategoryBadgeStyle(post.category)}`}>
+                        {getCategoryLabel(post.category)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">· {post.author} · {timeAgo(post.created_at)}</span>
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <p className="text-sm font-bold text-foreground group-hover:text-primary truncate transition-colors">
-                          {post.title}
-                        </p>
-                        {post.comment_count > 0 && (
-                          <span className="text-[11px] font-extrabold text-rose-500 flex-shrink-0">
-                            [{post.comment_count}]
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-0.5"><Icons.Heart /> {post.likes}</span>
-                        <span>·</span>
-                        <span className="truncate max-w-[80px]">{post.author}</span>
-                        <span>·</span>
-                        <span className="text-primary font-medium">{getCategoryLabel(post.category)}</span>
-                      </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                        {post.title}
+                      </h3>
+                      {post.comment_count > 0 && (
+                        <span className="text-[13px] font-extrabold text-rose-500 flex-shrink-0">
+                          [{post.comment_count}]
+                        </span>
+                      )}
                     </div>
-                  </li>
-                )) : (
-                  <li className="text-xs text-muted-foreground py-4 text-center">아직 인기글이 없습니다.</li>
-                )}
-              </ul>
+                  </div>
+
+                  <div className="flex-shrink-0 flex items-center gap-3 text-xs font-medium text-muted-foreground ml-2 hidden sm:flex">
+                    <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
+                        <Icons.Heart /> 
+                        <span>{post.likes}</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
+                        <Icons.Eye />
+                        <span>{post.views}</span>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="p-20 text-center text-muted-foreground font-bold">
+              <div className="text-3xl mb-3 opacity-50">📂</div>
+              조건에 맞는 게시글이 없습니다.
             </div>
-
-            {/* 스크롤 따라다니는 영역 (sticky) */}
-            <div className="sticky top-24 space-y-6 hidden lg:block">
-              
-              <button 
-                onClick={() => router.push("/community/write")}
-                className="w-full py-3.5 bg-primary text-primary-foreground rounded-2xl font-bold text-sm shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                <Icons.Edit /> 새 글 작성하기
-              </button>
-
-              <footer className="text-xs text-muted-foreground px-2 text-center">
-                <p>© 2026 GameSeed Inc.</p>
-                <div className="flex justify-center gap-2 mt-1 opacity-70">
-                  <span className="hover:text-foreground cursor-pointer transition-colors">이용약관</span> · <span className="hover:text-foreground cursor-pointer transition-colors">문의하기</span>
-                </div>
-              </footer>
-            </div>
-
-          </aside>
-
+          )}
         </div>
+
+        {/* 페이지네이션 */}
+        {totalPages > 0 && (
+          <div className="flex justify-center items-center gap-2 mb-8">
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed bg-card"
+            >
+              <Icons.ChevronLeft />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(number => Math.abs(currentPage - number) < 5 || number === 1 || number === totalPages)
+                .map((number, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const showEllipsis = prev && number - prev > 1;
+                    return (
+                      <div key={number} className="flex items-center">
+                        {showEllipsis && <span className="px-1 text-muted-foreground text-xs">...</span>}
+                        <button
+                          onClick={() => paginate(number)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${
+                            currentPage === number
+                              ? "bg-primary text-primary-foreground shadow-md scale-110"
+                              : "bg-card text-foreground hover:bg-accent border border-transparent hover:border-border"
+                          }`}
+                        >
+                          {number}
+                        </button>
+                      </div>
+                    );
+                })}
+            </div>
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed bg-card text-sm font-medium"
+            >
+              다음 <Icons.ChevronRight />
+            </button>
+          </div>
+        )}
+
+        {/* 하단 검색창 */}
+        <div className="flex justify-center items-center gap-2 mb-8">
+          <div className="flex bg-card border border-border rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden">
+            <select 
+              value={searchType} 
+              onChange={(e) => setSearchType(e.target.value)}
+              className="bg-muted border-r border-border text-xs font-bold px-3 py-2 outline-none text-foreground"
+            >
+              <option value="title_content">제목+내용</option>
+              <option value="title">제목</option>
+              <option value="content">내용</option>
+              <option value="nickname">닉네임</option>
+            </select>
+            <input 
+              type="text" 
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="검색어 입력"
+              className="px-4 py-2 text-sm outline-none w-48 sm:w-64 bg-transparent text-foreground"
+            />
+            <button onClick={handleSearch} className="px-4 bg-muted hover:bg-accent text-muted-foreground transition-colors">
+              <Icons.Search />
+            </button>
+          </div>
+        </div>
+
       </main>
     </div>
   );

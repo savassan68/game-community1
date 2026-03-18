@@ -32,19 +32,21 @@ async function main() {
       if (data.success && data.reviews.length > 0) {
         // 3. 우리 DB 포맷에 맞게 변환
         const reviewsToInsert = data.reviews.map(r => ({
+          recommendationid: r.recommendationid, // ⭐ 핵심 1: 스팀 고유 리뷰 ID 추가!
           game_id: game.id,
-          content: r.review, // 리뷰 내용
-          // 스팀은 추천(Up)/비추천(Down)만 있음 -> 100점 / 20점 으로 변환
+          content: r.review, 
           rating: r.voted_up ? 100 : 20, 
-          author: `SteamUser_${r.author.steamid.slice(-4)}`, // 익명 ID 처리
-          user_id: null, // 우리 사이트 회원이 아니므로 null (시스템 계정 취급)
+          author: `SteamUser_${r.author.steamid.slice(-4)}`,
           created_at: new Date(r.timestamp_created * 1000).toISOString()
         }));
 
-        // 4. 저장 (중복 방지 로직이 없으므로 계속 쌓일 수 있음. 필요시 기존 것 삭제 후 추가)
+        // 4. 중복 방지 저장 (upsert 사용)
         const { error: insertError } = await supabase
-          .from('steam_reviews') // ⭐ 새로 만든 스팀 전용 테이블로 쏙!
-          .insert(reviewsToInsert);
+          .from('steam_reviews') 
+          .upsert(reviewsToInsert, { 
+            onConflict: 'recommendationid', // ⭐ 핵심 2: 이 ID가 겹치면
+            ignoreDuplicates: true          // ⭐ 에러 내지 말고 무시해라!
+          });
 
         if (insertError) {
           console.log(`❌ 저장 실패: ${insertError.message}`);

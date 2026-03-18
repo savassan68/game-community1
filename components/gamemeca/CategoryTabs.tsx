@@ -18,7 +18,7 @@ const categories: { label: string; value: NewsCategory }[] = [
 
 export default function CategoryTabs({ activeCategory, onChange }: Props) {
   return (
-    <div className="mb-8 flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center justify-center gap-2">
       {categories.map((category) => {
         const active = activeCategory === category.value;
 
@@ -26,12 +26,13 @@ export default function CategoryTabs({ activeCategory, onChange }: Props) {
           <button
             key={category.value}
             onClick={() => onChange(category.value)}
-            className={[
-              "rounded-full px-4 py-2 text-sm font-medium transition",
-              active
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200",
-            ].join(" ")}
+            className={`
+              rounded-xl px-5 py-2.5 text-sm font-black transition-all duration-200
+              ${active 
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-105" 
+                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              }
+            `}
           >
             {category.label}
           </button>

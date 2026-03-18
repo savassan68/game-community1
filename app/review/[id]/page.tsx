@@ -9,11 +9,9 @@ const Icons = {
   ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
   Heart: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
-  // ⭐ 시계(플레이 타임) 아이콘 추가
   Clock: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 };
 
-// ⭐ Review 타입에 playtime 추가
 type Review = { id: number; content: string; rating: number; author: string; user_id: string | null; created_at: string; game_id?: number; likes?: number; playtime?: number; };
 type Game = { id: number; title: string; description: string; image_url: string; categories: string[]; metacritic_score?: number; opencritic_score?: number; };
 type CriticReview = { id: number; outlet: string; author: string; rating: number; content: string; url: string; };
@@ -27,8 +25,6 @@ export default function GameDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [criticReviews, setCriticReviews] = useState<CriticReview[]>([]);
   const [user, setUser] = useState<any>(null);
-  
-  // ⭐ 현재 로그인한 유저의 이 게임 플레이 시간 (스팀 연동 데이터)
   const [userPlaytime, setUserPlaytime] = useState<number | null>(null);
 
   const [myReview, setMyReview] = useState("");
@@ -45,6 +41,10 @@ export default function GameDetailPage() {
 
   const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
   const toggleReview = (key: string) => setExpandedReviews(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // ⭐ 리스트 개수 제한을 위한 상태값 추가 (기본 3개씩 노출)
+  const [visibleSteamCount, setVisibleSteamCount] = useState(3);
+  const [visibleCriticCount, setVisibleCriticCount] = useState(3);
 
   const [steamReviews, setSteamReviews] = useState<Review[]>([]); 
   const siteReviews = reviews;
@@ -64,16 +64,12 @@ export default function GameDetailPage() {
           categories: gameData.categories ? gameData.categories.join(", ") : "",
         });
 
-        // ⭐[여기서부터 복사해서 딱 끼워넣어 주세요!] ⭐
         const savedGames = JSON.parse(localStorage.getItem("recentGames") || "[]");
         const newGame = { id: gameData.id, title: gameData.title, url: `/review/${gameData.id}` };
-        
         const filteredGames = savedGames.filter((g: any) => g.id !== gameData.id);
         const updatedGames = [newGame, ...filteredGames].slice(0, 5);
-        
         localStorage.setItem("recentGames", JSON.stringify(updatedGames));
         window.dispatchEvent(new Event("recentGamesUpdated"));
-        // ⭐ [여기까지 추가!] ⭐
       }
 
       const { data: reviewData } = await supabase.from("reviews").select("*").eq("game_id", gameId).order("created_at", { ascending: false });
@@ -88,14 +84,12 @@ export default function GameDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       
-      // ⭐ 스팀 연동 플레이 시간 가져오기 로직
       if (session?.user && gameData) {
-        // user_owned_games 테이블에서 현재 접속한 게임 제목과 일치하는 내역이 있는지 검색합니다.
         const { data: ownedGame } = await supabase
           .from("user_owned_games")
           .select("playtime_forever")
           .eq("user_id", session.user.id)
-          .ilike("game_title", `%${gameData.title}%`) // 제목으로 매칭
+          .ilike("game_title", `%${gameData.title}%`)
           .maybeSingle();
         
         if (ownedGame) {
@@ -125,14 +119,13 @@ export default function GameDetailPage() {
     if (!user) return alert("로그인이 필요합니다.");
     if (!myReview.trim()) return alert("내용을 입력해주세요.");
     
-    // ⭐ 리뷰 등록 시 DB에 playtime을 함께 전송합니다.
     const { error } = await supabase.from("reviews").insert({ 
       game_id: gameId, 
       content: myReview, 
       rating: myRating, 
       author: user.email, 
       user_id: user.id, 
-      playtime: userPlaytime || 0, // 스팀 데이터가 없으면 0으로 저장
+      playtime: userPlaytime || 0,
       created_at: new Date().toISOString() 
     });
     
@@ -187,7 +180,7 @@ export default function GameDetailPage() {
           <Icons.ChevronLeft /> 목록으로
         </button>
 
-        {/* 🎮 게임 기본 정보 섹션 (기존과 동일) */}
+        {/* 🎮 게임 기본 정보 섹션 */}
         <section className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden mb-12 flex flex-col md:flex-row relative transition-colors">
           {isEditing ? (
              <div className="p-8 w-full flex flex-col gap-4">
@@ -251,15 +244,11 @@ export default function GameDetailPage() {
           
           {/* 📝 리뷰 작성 및 GameSeed 유저 평론 */}
           <div className="lg:col-span-7 space-y-10">
-            
+            {/* 상단 폼 영역 (생략, 기존과 동일) */}
             <section className="bg-card p-6 rounded-3xl border border-border shadow-sm relative overflow-hidden group transition-colors">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-purple-500"></div>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-black text-foreground">
-                  이 게임, 어떠셨나요?
-                </h2>
-                
-                {/* ⭐ 스팀 연동 플레이 타임 감지 안내 뱃지 */}
+                <h2 className="text-lg font-black text-foreground">이 게임, 어떠셨나요?</h2>
                 {userPlaytime !== null && userPlaytime > 0 && (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#171a21]/10 dark:bg-[#1b2838]/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg border border-indigo-500/20">
                     <Icons.Clock /> 스팀 플레이 {(userPlaytime / 60).toFixed(1)}시간 인증됨
@@ -277,7 +266,7 @@ export default function GameDetailPage() {
                       <div className="flex justify-between text-xs font-bold text-muted-foreground mb-2">
                         <span>0점 (비추천)</span>
                         <span className="text-primary">점수를 조절해주세요</span>
-                        <span>100점 (강력 추천)</span>
+                        <span>100점 (추천)</span>
                       </div>
                       <input type="range" min={0} max={100} value={myRating} onChange={(e) => setMyRating(Number(e.target.value))} className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer" />
                     </div>
@@ -297,9 +286,7 @@ export default function GameDetailPage() {
               ) : (
                 <div className="py-10 text-center flex flex-col items-center justify-center bg-muted/30 rounded-2xl border border-border">
                   <p className="text-sm font-bold text-muted-foreground mb-3">리뷰를 작성하려면 로그인이 필요합니다.</p>
-                  <button onClick={() => router.push('/auth/login')} className="px-5 py-2 bg-card border border-border text-primary font-bold rounded-xl shadow-sm hover:bg-muted transition-colors">
-                    로그인하러 가기
-                  </button>
+                  <button onClick={() => router.push('/auth/login')} className="px-5 py-2 bg-card border border-border text-primary font-bold rounded-xl shadow-sm hover:bg-muted transition-colors">로그인하러 가기</button>
                 </div>
               )}
             </section>
@@ -331,7 +318,6 @@ export default function GameDetailPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-extrabold text-sm text-foreground">{r.author?.split("@")[0] ?? "익명"}</span>
-                                {/* ⭐ 개별 리뷰에 달리는 플레이 타임 인증 뱃지 */}
                                 {r.playtime !== undefined && r.playtime > 0 && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-md border border-indigo-500/20">
                                     <Icons.Clock /> {(r.playtime / 60).toFixed(1)}시간
@@ -367,54 +353,79 @@ export default function GameDetailPage() {
             </section>
           </div>
 
-          {/* 📡 외부(Steam) 및 전문가 평론 섹션 (기존 코드 유지) */}
+          {/* 📡 외부(Steam) 및 전문가 평론 섹션 */}
           <aside className="lg:col-span-5 space-y-8">
-            {/* ...(생략 없이 기존과 동일하게 들어있습니다. 복사하시면 그대로 적용됩니다!) ... */}
             
+            {/* ⭐ 스팀 평론 개수 제한 로직 반영 */}
             <div className="bg-card rounded-3xl border border-border p-6 shadow-sm transition-colors">
-              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-border">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                <h3 className="font-extrabold text-foreground text-base">외부(Steam) 유저 평론</h3>
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                  <h3 className="font-extrabold text-foreground text-base">외부(Steam) 유저 평론</h3>
+                </div>
+                <span className="text-xs font-bold text-muted-foreground">총 {steamReviews.length}개</span>
               </div>
               <div className="space-y-5">
-                {steamReviews.length > 0 ? steamReviews.map((r) => {
-                  const content = cleanSteamContent(r.content);
-                  const isLong = content.length > 150; 
-                  const isExpanded = expandedReviews[`steam_${r.id}`];
+                {steamReviews.length > 0 ? (
+                  <>
+                    {/* 전체 배열에서 visibleSteamCount 만큼만 잘라서(slice) 렌더링합니다. */}
+                    {steamReviews.slice(0, visibleSteamCount).map((r) => {
+                      const content = cleanSteamContent(r.content);
+                      const isLong = content.length > 150; 
+                      const isExpanded = expandedReviews[`steam_${r.id}`];
 
-                  return (
-                    <div key={r.id} className="flex gap-4 group transition-all">
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${getScoreStyle(r.rating)}`}>
-                        <span className="text-sm font-black">{r.rating}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-1.5">
-                          <span className="text-sm font-bold text-foreground truncate">{r.author}</span>
-                          <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">{new Date(r.created_at).toLocaleDateString()}</span>
+                      return (
+                        <div key={r.id} className="flex gap-4 group transition-all">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${getScoreStyle(r.rating)}`}>
+                            <span className="text-sm font-black">{r.rating}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-baseline mb-1.5">
+                              <span className="text-sm font-bold text-foreground truncate">{r.author}</span>
+                              <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">{new Date(r.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <p className={`text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
+                              {content}
+                            </p>
+                            {isLong && (
+                              <button onClick={() => toggleReview(`steam_${r.id}`)} className="text-xs font-bold text-primary hover:underline mt-1.5 transition-colors">
+                                {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p className={`text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
-                          {content}
-                        </p>
-                        {isLong && (
-                          <button onClick={() => toggleReview(`steam_${r.id}`)} className="text-xs font-bold text-primary hover:underline mt-1.5 transition-colors">
-                            {isExpanded ? "접기 ▲" : "더보기 ▼"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }) : <div className="text-sm text-muted-foreground text-center py-6">스팀 평론이 없습니다.</div>}
+                      );
+                    })}
+
+                    {/* 보여줄 리뷰가 더 남아있다면 '더보기' 버튼 노출 */}
+                    {steamReviews.length > visibleSteamCount && (
+                      <button 
+                        onClick={() => setVisibleSteamCount(prev => prev + 5)}
+                        className="w-full py-2 mt-2 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-colors"
+                      >
+                        스팀 리뷰 더보기 ({visibleSteamCount} / {steamReviews.length}) ▼
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-6">스팀 평론이 없습니다.</div>
+                )}
               </div>
             </div>
 
+            {/* ⭐ 전문가 평론 개수 제한 로직 반영 */}
             {criticReviews.length > 0 && (
               <div className="bg-slate-900 dark:bg-slate-950 rounded-3xl border border-border p-6 shadow-lg text-white transition-colors">
-                <div className="flex items-center gap-2 mb-5 pb-4 border-b border-slate-700">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
-                  <h3 className="font-extrabold text-slate-100 text-base">전문가 평론</h3>
+                <div className="flex items-center justify-between mb-5 pb-4 border-b border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                    <h3 className="font-extrabold text-slate-100 text-base">전문가 평론</h3>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">총 {criticReviews.length}개</span>
                 </div>
                 <div className="space-y-5">
-                  {criticReviews.map((cr) => {
+                  {/* 전체 배열에서 visibleCriticCount 만큼만 잘라서(slice) 렌더링합니다. */}
+                  {criticReviews.slice(0, visibleCriticCount).map((cr) => {
                     const isLong = cr.content.length > 120;
                     const isExpanded = expandedReviews[`critic_${cr.id}`];
 
@@ -429,13 +440,23 @@ export default function GameDetailPage() {
                         </p>
                         {isLong && (
                           <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-400 hover:text-amber-300 mb-2 transition-colors">
-                            {isExpanded ? "접기 ▲" : "더보기 ▼"}
+                            {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
                           </button>
                         )}
                         <div className="text-xs text-slate-500">by {cr.author}</div>
                       </div>
                     );
                   })}
+
+                  {/* 보여줄 리뷰가 더 남아있다면 '더보기' 버튼 노출 */}
+                  {criticReviews.length > visibleCriticCount && (
+                    <button 
+                      onClick={() => setVisibleCriticCount(prev => prev + 5)}
+                      className="w-full py-2 mt-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl transition-colors"
+                    >
+                      전문가 평론 더보기 ({visibleCriticCount} / {criticReviews.length}) ▼
+                    </button>
+                  )}
                 </div>
               </div>
             )}
