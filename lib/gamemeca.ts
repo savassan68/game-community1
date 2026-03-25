@@ -30,31 +30,14 @@ export type GameMecaArticle = {
 
 const BASE_URL = "https://www.gamemeca.com";
 
-const CATEGORY_URL_MAP: Record<Exclude<NewsCategory, "esports">, string> = {
+const CATEGORY_URL_MAP: Record<NewsCategory, string> = {
   main: `${BASE_URL}/news.php`,
   industry: `${BASE_URL}/news.php?ca=I`,
+  esports: `${BASE_URL}/news.php?ca=T&se=146`,
   pc: `${BASE_URL}/news.php?ca=P`,
   mobile: `${BASE_URL}/news.php?ca=M`,
   console: `${BASE_URL}/news.php?ca=V`,
 };
-
-const ESPORTS_KEYWORDS = [
-  "e스포츠",
-  "이스포츠",
-  "LCK",
-  "LoL",
-  "리그 오브 레전드",
-  "발로란트",
-  "오버워치",
-  "FC 온라인",
-  "플레이오프",
-  "결승전",
-  "챔피언스",
-  "T1",
-  "젠지",
-  "디플러스 기아",
-  "한화생명e스포츠",
-];
 
 function normalizeUrl(url?: string) {
   if (!url) return "";
@@ -74,19 +57,12 @@ function slugFromArticleUrl(articleUrl: string) {
   }
 }
 
-function isEsportsArticle(title: string, summary: string) {
-  const text = `${title} ${summary}`.toLowerCase();
-  return ESPORTS_KEYWORDS.some((keyword) =>
-    text.includes(keyword.toLowerCase())
-  );
+function cleanText(value?: string) {
+  return (value || "").replace(/\s+/g, " ").trim();
 }
 
-function extractImageFromElement(
-  $: cheerio.CheerioAPI,
-  root: cheerio.Cheerio<any>
-) {
+function extractImageFromElement(root: cheerio.Cheerio<any>) {
   const img = root.find("img").first();
-
   if (!img.length) return "";
 
   const raw =
@@ -100,13 +76,36 @@ function extractImageFromElement(
   return normalizeUrl(raw);
 }
 
+async function fetchArticleOgImage(articleUrl: string) {
+  try {
+    const res = await fetch(articleUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) return "";
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    return (
+      normalizeUrl($("meta[property='og:image']").attr("content")) ||
+      normalizeUrl($("meta[name='twitter:image']").attr("content")) ||
+      normalizeUrl($(".article img").first().attr("src")) ||
+      normalizeUrl($(".view_cont img").first().attr("src")) ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchGameMecaList(
   category: NewsCategory
 ): Promise<GameMecaListItem[]> {
-  const targetUrl =
-    category === "esports"
-      ? CATEGORY_URL_MAP.main
-      : CATEGORY_URL_MAP[category as Exclude<NewsCategory, "esports">];
+  const targetUrl = CATEGORY_URL_MAP[category];
 
   const res = await fetch(targetUrl, {
     headers: {
@@ -125,46 +124,39 @@ export async function fetchGameMecaList(
   const items: GameMecaListItem[] = [];
 
   $("a[href*='view.php?gid=']").each((_, el) => {
-    const href = $(el).attr("href");
+    const link = $(el);
+    const href = link.attr("href");
     if (!href) return;
 
     const articleUrl = normalizeUrl(href);
 
+    const wrapper = link.closest("li, article, tr, dl, .list_li, .news_li, .cont_li");
+    const wrapperText = cleanText(wrapper.text());
+
     const title =
-      $(el).find("strong").first().text().trim() ||
-      $(el).attr("title")?.trim() ||
-      $(el).text().replace(/\s+/g, " ").trim();
+      cleanText(link.find("strong").first().text()) ||
+      cleanText(link.attr("title")) ||
+      cleanText(wrapper.find("strong").first().text()) ||
+      cleanText(wrapper.find(".tit").first().text()) ||
+      cleanText(wrapper.find(".title").first().text()) ||
+      cleanText(link.text());
 
     if (!title || title.length < 5) return;
 
-    const wrapper = $(el).closest("li, article, div, tr, dl");
-    const wrapperText = wrapper.text().replace(/\s+/g, " ").trim();
+    const summary =
+      cleanText(wrapper.find("p").first().text()) ||
+      cleanText(wrapper.find(".txt").first().text()) ||
+      cleanText(wrapper.find(".desc").first().text()) ||
+      cleanText(wrapper.find(".summary").first().text()) ||
+      cleanText(wrapperText.replace(title, ""));
 
-    let summary = "";
-    const summaryCandidates = [
-      wrapper.find("p").first().text().trim(),
-      wrapper.find(".txt").first().text().trim(),
-      wrapper.find(".desc").first().text().trim(),
-      wrapper.find(".summary").first().text().trim(),
-    ].filter(Boolean);
+    // 이미지 탐색 범위를 줄여서 같은 썸네일 반복 문제를 막음
+    let imageUrl =
+      extractImageFromElement(link) ||
+      extractImageFromElement(wrapper.find("a").first()) ||
+      extractImageFromElement(wrapper);
 
-    if (summaryCandidates.length > 0) {
-      summary = summaryCandidates[0];
-    } else {
-      summary = wrapperText.replace(title, "").trim();
-    }
-
-    // ⭐ 핵심 수정 포인트: 남의 사진을 훔쳐오던 prevAll() 로직을 삭제하고,
-    // 현재 기사의 가장 큰 테두리(li 컨테이너) 안에서만 찾도록 수정했습니다!
-    const liContainer = $(el).closest("li, article, tr"); 
-    const imageUrl = 
-      extractImageFromElement($, liContainer) || 
-      extractImageFromElement($, wrapper) || 
-      "";
-
-    const createdAtMatch = wrapperText.match(
-      /\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}/
-    );
+    const createdAtMatch = wrapperText.match(/\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}/);
     const createdAt = createdAtMatch ? createdAtMatch[0] : "";
 
     items.push({
@@ -182,15 +174,35 @@ export async function fetchGameMecaList(
     new Map(items.map((item) => [item.articleUrl, item])).values()
   );
 
-  let filtered = unique.filter((item) => item.title.length > 3);
+  const filtered = unique.filter((item) => item.title.length > 3).slice(0, 20);
 
-  if (category === "esports") {
-    filtered = filtered.filter((item) =>
-      isEsportsArticle(item.title, item.summary)
-    );
+  // 같은 이미지가 반복되거나 이미지가 비어 있으면 기사 상세의 og:image로 보정
+  const imageCount = new Map<string, number>();
+  for (const item of filtered) {
+    if (!item.imageUrl) continue;
+    imageCount.set(item.imageUrl, (imageCount.get(item.imageUrl) || 0) + 1);
   }
 
-  return filtered.slice(0, 20);
+  const fixed = await Promise.all(
+    filtered.map(async (item) => {
+      const duplicated =
+        item.imageUrl && (imageCount.get(item.imageUrl) || 0) >= 2;
+
+      if (!item.imageUrl || duplicated) {
+        const ogImage = await fetchArticleOgImage(item.articleUrl);
+        if (ogImage) {
+          return {
+            ...item,
+            imageUrl: ogImage,
+          };
+        }
+      }
+
+      return item;
+    })
+  );
+
+  return fixed;
 }
 
 export async function fetchGameMecaArticle(
