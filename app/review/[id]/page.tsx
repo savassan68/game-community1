@@ -8,8 +8,15 @@ import { GAME_CATEGORIES } from "@/lib/constants";
 const Icons = {
   ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+  
+  // ⭐ 찜하기(북마크)용 별 모양 아이콘
+  StarOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+  StarSolid: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" /></svg>,
+  
+  // ⭐ 리뷰 추천(좋아요)용 하트 아이콘 (에러 방지를 위해 복구!)
   HeartOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
   HeartSolid: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>,
+
   Clock: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 };
 
@@ -28,7 +35,7 @@ export default function GameDetailPage() {
   const [user, setUser] = useState<any>(null);
   const [userPlaytime, setUserPlaytime] = useState<number | null>(null);
   
-  // ⭐ 찜하기(북마크) 상태
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
   const [myReview, setMyReview] = useState("");
@@ -77,13 +84,19 @@ export default function GameDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       
-      if (session?.user && gameData) {
-        const { data: ownedGame } = await supabase.from("user_owned_games").select("playtime_forever").eq("user_id", session.user.id).ilike("game_title", `%${gameData.title}%`).maybeSingle();
-        if (ownedGame) setUserPlaytime(ownedGame.playtime_forever);
+      if (session?.user) {
+        const { data: profileData } = await supabase.from("user_profiles").select("role").eq("id", session.user.id).maybeSingle();
+        if (profileData && profileData.role === 'admin') {
+          setIsAdmin(true);
+        }
 
-        // ⭐ 찜하기(북마크) 여부 확인
-        const { data: bookmarkData } = await supabase.from("game_bookmarks").select("id").eq("user_id", session.user.id).eq("game_id", gameData.id).maybeSingle();
-        if (bookmarkData) setIsBookmarked(true);
+        if (gameData) {
+          const { data: ownedGame } = await supabase.from("user_owned_games").select("playtime_forever").eq("user_id", session.user.id).ilike("game_title", `%${gameData.title}%`).maybeSingle();
+          if (ownedGame) setUserPlaytime(ownedGame.playtime_forever);
+
+          const { data: bookmarkData } = await supabase.from("game_bookmarks").select("id").eq("user_id", session.user.id).eq("game_id", gameData.id).maybeSingle();
+          if (bookmarkData) setIsBookmarked(true);
+        }
       }
 
       setLoading(false);
@@ -91,7 +104,6 @@ export default function GameDetailPage() {
     fetchData();
   }, [gameId]);
 
-  // ⭐ 찜하기 토글 함수
   const toggleBookmark = async () => {
     if (!user) return alert("로그인이 필요합니다.");
     
@@ -170,7 +182,7 @@ export default function GameDetailPage() {
         </button>
 
         <section className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden mb-12 flex flex-col md:flex-row relative transition-colors">
-          {isEditing ? (
+          {isEditing && isAdmin ? (
              <div className="p-8 w-full flex flex-col gap-4">
               <input type="text" value={editForm.image_url} onChange={(e) => setEditForm({...editForm, image_url: e.target.value})} className="p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="이미지 URL" />
               <input value={editForm.title} onChange={(e) => setEditForm({...editForm, title: e.target.value})} className="text-2xl font-bold p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="게임 제목" />
@@ -201,17 +213,18 @@ export default function GameDetailPage() {
                   ))}
                 </div>
                 
-                {/* ⭐ 게임 제목 & 찜하기 버튼 */}
                 <div className="flex justify-between items-start gap-4 mb-4">
                   <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight">{game.title}</h1>
                   <button 
                     onClick={toggleBookmark} 
                     className={`flex-shrink-0 p-3 rounded-full shadow-sm border transition-all active:scale-95 ${
-                      isBookmarked ? "bg-rose-50 border-rose-200 text-rose-500" : "bg-card border-border text-muted-foreground hover:text-rose-400 hover:border-rose-200"
+                      isBookmarked 
+                        ? "bg-amber-50 border-amber-200 text-amber-500 dark:bg-amber-500/10 dark:border-amber-500/30" 
+                        : "bg-card border-border text-muted-foreground hover:text-amber-500 hover:border-amber-300"
                     }`}
                     title={isBookmarked ? "찜 취소" : "찜하기"}
                   >
-                    {isBookmarked ? <Icons.HeartSolid /> : <Icons.HeartOutline />}
+                    {isBookmarked ? <Icons.StarSolid /> : <Icons.StarOutline />}
                   </button>
                 </div>
 
@@ -244,8 +257,8 @@ export default function GameDetailPage() {
                   </div>
                 </div>
 
-                {user && (
-                  <div className="absolute top-4 right-4 md:top-6 md:right-16">
+                {isAdmin && (
+                  <div className="absolute top-4 right-4 md:top-6 md:right-16 flex gap-2">
                     <button onClick={() => setIsEditing(true)} className="p-2 text-muted-foreground hover:text-primary transition-colors bg-card rounded-full shadow-sm hover:shadow-md border border-border" title="게임 정보 수정">
                       <Icons.Edit />
                     </button>
@@ -348,7 +361,12 @@ export default function GameDetailPage() {
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-sm text-foreground">{r.author?.split("@")[0] ?? "익명"}</span>
+                              <span 
+                                onClick={() => { if (r.user_id) router.push(`/user/${r.user_id}`); }} 
+                                className="font-extrabold text-sm text-foreground hover:text-indigo-600 cursor-pointer transition-colors"
+                              >
+                                {r.author?.split("@")[0] ?? "익명"}
+                              </span>
                               {r.playtime !== undefined && r.playtime > 0 && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-md border border-indigo-500/20">
                                   <Icons.Clock /> {(r.playtime / 60).toFixed(1)}시간

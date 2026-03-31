@@ -9,6 +9,8 @@ const Icons = {
   Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
   Sparkles: () => <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
   X: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  Refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  External: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 };
 
 type RecommendedGame = {
@@ -18,9 +20,11 @@ type RecommendedGame = {
   metacritic: number;
   reason: string;
   genres: string[];
+  purchase_url?: string; // 추가됨
 };
 
 export default function RecommendPage() {
+  const router = useRouter(); // router 추가
   const [mode, setMode] = useState<"logic" | "sentence">("logic");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -28,6 +32,7 @@ export default function RecommendPage() {
   const [userInput, setUserInput] = useState("");
   const [recommendations, setRecommendations] = useState<RecommendedGame[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // 리프레시 상태 추가
 
   const fetchGames = async (query: string) => {
     if (query.length < 2) { setSearchResults([]); return; }
@@ -50,12 +55,22 @@ export default function RecommendPage() {
     }
   };
 
-  const handleGetRecommendation = async () => {
-    setIsLoading(true);
-    setRecommendations([]);
+  // 기존 함수에 retry 인자를 추가했습니다.
+  const handleGetRecommendation = async (retry = false) => {
+    if (retry) setIsRefreshing(true);
+    else {
+      setIsLoading(true);
+      setRecommendations([]);
+    }
+    
     try {
       const { data, error } = await supabase.functions.invoke("GameRecommend", {
-        body: { mode, selectedGames: selectedGames.map((g) => g.name), userInput: mode === "sentence" ? userInput : "" },
+        body: { 
+          mode, 
+          selectedGames: selectedGames.map((g) => g.name), 
+          userInput: mode === "sentence" ? userInput : "",
+          isRetry: retry // 서버로 retry 여부 전송
+        },
       });
       if (error) throw error;
       setRecommendations(data.recommendations);
@@ -63,6 +78,7 @@ export default function RecommendPage() {
       alert("추천 정보를 가져오는 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -139,7 +155,7 @@ export default function RecommendPage() {
             </div>
           )}
           <button
-            onClick={handleGetRecommendation}
+            onClick={() => handleGetRecommendation(false)}
             disabled={isLoading || (mode === "logic" && selectedGames.length < 1) || (mode === "sentence" && !userInput)}
             className="w-full mt-10 py-5 bg-primary text-primary-foreground font-black rounded-3xl hover:scale-[1.01] active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
           >
@@ -150,7 +166,19 @@ export default function RecommendPage() {
         {/* Results */}
         {recommendations.length > 0 && (
           <div className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <h2 className="text-2xl font-black px-2 tracking-tight">AI 평론가가 선정한 발견</h2>
+            <div className="flex items-center justify-between px-2">
+              <h2 className="text-2xl font-black tracking-tight">AI 평론가가 선정한 발견</h2>
+              {/* 다른 게임 추천받기 버튼 추가 */}
+              <button 
+                onClick={() => handleGetRecommendation(true)} 
+                disabled={isRefreshing}
+                className="flex items-center gap-2 text-xs font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10 hover:bg-primary/10 transition-all"
+              >
+                <div className={isRefreshing ? "animate-spin" : ""}><Icons.Refresh /></div>
+                {isRefreshing ? "새로운 발견 검색 중..." : "다른 게임 더 보기"}
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 gap-10">
               {recommendations.map((game) => (
                 <div key={game.id} className="group bg-card border border-border rounded-[3rem] overflow-hidden flex flex-col lg:flex-row hover:border-primary/50 transition-all duration-500 shadow-sm hover:shadow-2xl">
@@ -174,10 +202,27 @@ export default function RecommendPage() {
                         </div>
                       )}
                     </div>
-                    <div className="relative">
+                    <div className="relative mb-8">
                       <p className="text-base lg:text-lg text-muted-foreground leading-relaxed font-medium italic border-l-4 border-primary/40 pl-6 py-2">
                         {game.reason}
                       </p>
+                    </div>
+                    {/* 버튼 그룹 추가 */}
+                    <div className="flex flex-wrap gap-3">
+                      <button 
+                        onClick={() => router.push(`/review/${game.id}`)}
+                        className="px-6 py-3 bg-muted hover:bg-muted/80 text-xs font-bold rounded-2xl transition-all"
+                      >
+                        커뮤니티 평론
+                      </button>
+                      <a 
+                        href={game.purchase_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="px-6 py-3 bg-primary text-primary-foreground text-xs font-black rounded-2xl transition-all flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105"
+                      >
+                        <Icons.External /> 지금 플레이하기
+                      </a>
                     </div>
                   </div>
                 </div>

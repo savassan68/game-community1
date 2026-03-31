@@ -42,7 +42,14 @@ export default function FixTagsPage() {
   const addLog = (msg: string) => setLogs((prev) => [msg, ...prev]);
 
   const handleFixTags = async () => {
-    setLoading(true);
+  // 🔐 보안 추가
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    alert("관리자만 접근할 수 있습니다.");
+    return;
+  }
+  
+  setLoading(true);
     setLogs([]);
     setProgress(0);
 

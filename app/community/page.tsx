@@ -77,35 +77,36 @@ export default function CommunityPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data.session?.user ?? null);
-    };
-    checkAuth();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (_event === "SIGNED_OUT") router.refresh();
-    });
-    return () => subscription.unsubscribe();
-  }, [router]);
-
-  useEffect(() => {
     const fetchPosts = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("community")
-        .select("*, comments(count)")
-        .order("id", { ascending: false });
+      try {
+        // ⭐ 수정됨: comments(count)를 제거하고 순수하게 글 목록만 가져옵니다.
+        const { data, error } = await supabase
+          .from("community")
+          .select("*") 
+          .order("id", { ascending: false });
 
-      if (!error && data) {
-        const formatted = data.map((item: any) => ({
-          ...item,
-          comment_count: item.comments?.[0]?.count || 0,
-          category: item.category || "free"
-        }));
-        setPosts(formatted);
+        if (error) {
+          console.error("게시글 로딩 에러:", error.message);
+          setLoading(false);
+          return;
+        }
+
+        if (data) {
+          const formatted = data.map((item: any) => ({
+            ...item,
+            // ⭐ 당분간 댓글 개수는 0으로 표시하거나, 
+            // 나중에 필요하면 별도로 count 쿼리를 날려야 합니다.
+            comment_count: item.comment_count || 0, 
+            category: item.category || "free"
+          }));
+          setPosts(formatted);
+        }
+      } catch (err) {
+        console.error("Unexpected Error:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchPosts();
   }, []);

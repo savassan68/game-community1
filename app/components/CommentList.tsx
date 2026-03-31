@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import supabase from "@/lib/supabaseClient";
-import CommentForm from "./CommentForm"; 
+import { useRouter } from "next/navigation";
+import supabase from "@/lib/supabaseClient"; 
+import CommentForm from "./CommentForm";
 
-// ⭐ 대댓글용 꺾인 화살표 아이콘 추가
 const Icons = {
-  CornerDownRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4v11a2 2 0 002 2h10" /></svg>
+  CornerDownRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4v11a2 2 0 002 2h10" /></svg>,
+  Alert: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
 };
 
 interface Comment {
@@ -24,6 +25,8 @@ interface CommentListProps {
   currentUserId: string | null;
   onCommentUpdated: () => void;
   postId: number;
+  // ⭐ 부모의 handleReportOpen 함수와 형식을 완벽히 맞췄습니다.
+  onReport: (type: 'post' | 'comment', id: number | string, author: string, content: string) => void;
 }
 
 function timeAgo(dateString: string) {
@@ -41,7 +44,9 @@ export default function CommentList({
   currentUserId,
   onCommentUpdated,
   postId,
+  onReport, 
 }: CommentListProps) {
+  const router = useRouter(); 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [replyingId, setReplyingId] = useState<number | null>(null);
@@ -73,29 +78,28 @@ export default function CommentList({
     if (!error) onCommentUpdated();
   };
 
-  if (comments.length === 0)
-    return (
-      <div className="py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border transition-colors font-bold text-sm">
-        <div className="text-3xl mb-2 opacity-50">💬</div>
-        첫 번째 댓글을 남겨보세요!
-      </div>
-    );
-
   const renderCommentItem = (c: Comment, isReply: boolean = false) => (
     <div className={`flex items-start gap-3 ${isReply ? "py-3" : "py-5"} group transition-colors`}>
       
-      {/* 아바타 영역 */}
-      <div className={`flex-shrink-0 rounded-full flex items-center justify-center font-bold border border-border shadow-sm transition-colors ${
-        isReply 
-        ? "w-8 h-8 bg-primary/10 text-primary text-xs" 
-        : "w-10 h-10 bg-muted text-muted-foreground text-sm"
-      }`}>
+      <div 
+        onClick={() => router.push(`/user/${c.user_id}`)}
+        className={`flex-shrink-0 rounded-full flex items-center justify-center font-bold border border-border shadow-sm cursor-pointer transition-transform hover:scale-105 ${
+          isReply 
+          ? "w-8 h-8 bg-primary/10 text-primary text-xs" 
+          : "w-10 h-10 bg-muted text-muted-foreground text-sm hover:bg-primary/20 hover:text-primary"
+        }`}
+      >
         {(c.nickname || "U").charAt(0).toUpperCase()}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="font-extrabold text-foreground text-sm">{c.nickname || "익명 사용자"}</span>
+          <span 
+            onClick={() => router.push(`/user/${c.user_id}`)}
+            className="font-extrabold text-foreground text-sm cursor-pointer hover:text-primary transition-colors"
+          >
+            {c.nickname || "익명 사용자"}
+          </span>
           <span className="text-xs font-bold text-muted-foreground">{timeAgo(c.created_at)}</span>
         </div>
 
@@ -111,7 +115,6 @@ export default function CommentList({
           <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap mt-0.5">{c.content}</div>
         )}
 
-        {/* 버튼 영역 */}
         {!editingId && (
           <div className="flex items-center gap-3 mt-2.5">
             {!isReply && currentUserId && (
@@ -119,16 +122,26 @@ export default function CommentList({
                 {replyingId === c.id ? "답글 취소" : "답글 달기"}
               </button>
             )}
+
+            {/* ⭐ 수정됨: 첫 번째 인자로 'comment'를 명시적으로 넘깁니다. */}
+            {currentUserId && currentUserId !== c.user_id && (
+              <button 
+                onClick={() => onReport('comment', c.id, c.nickname || "익명 사용자", c.content)}
+                className="text-[11px] font-bold text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
+              >
+                <Icons.Alert /> 신고
+              </button>
+            )}
+
             {currentUserId === c.user_id && (
-              <>
+              <div className="flex gap-2">
                 <button onClick={() => startEdit(c)} className="text-[11px] font-bold text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100">수정</button>
                 <button onClick={() => deleteComment(c.id)} className="text-[11px] font-bold text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100">삭제</button>
-              </>
+              </div>
             )}
           </div>
         )}
 
-        {/* 답글 입력 폼 */}
         {replyingId === c.id && (
           <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <CommentForm
@@ -147,6 +160,14 @@ export default function CommentList({
     </div>
   );
 
+  if (comments.length === 0)
+    return (
+      <div className="py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border transition-colors font-bold text-sm">
+        <div className="text-3xl mb-2 opacity-50">💬</div>
+        첫 번째 댓글을 남겨보세요!
+      </div>
+    );
+
   return (
     <ul className="divide-y divide-border transition-colors">
       {parentComments.map((parent) => {
@@ -158,12 +179,10 @@ export default function CommentList({
           <li key={parent.id} className="relative">
             {renderCommentItem(parent, false)}
 
-            {/* 대댓글 렌더링 영역 */}
             {replies.length > 0 && (
               <ul className="ml-5 sm:ml-12 mt-1 mb-4 space-y-1">
                 {replies.map((reply) => (
                   <li key={reply.id} className="flex gap-2 sm:gap-3 items-start">
-                    {/* ⭐ 꺾인 화살표 아이콘 적용 */}
                     <div className="mt-4 text-border flex-shrink-0">
                       <Icons.CornerDownRight />
                     </div>
