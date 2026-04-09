@@ -5,7 +5,9 @@ import Header from "./components/Header";
 import { ThemeProvider } from "./components/ThemeProvider";
 import RecentTabs from "./components/RecentTabs";
 
-// ⭐ 1. 방금 만든 FloatingChat 컴포넌트 불러오기
+// ⭐ 1. 우리가 새로 만든 ToastProvider 불러오기
+import { ToastProvider } from "./components/ToastProvider";
+
 import FloatingChat from "./components/FloatingChat";
 
 const geistSans = Geist({
@@ -36,17 +38,19 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          {/* 상단 네비게이션 헤더 */}
-          <Header />
-          
-          {/* 헤더 바로 아래에 최근 방문 탭 배치 (PC에서만 보임) */}
-          <RecentTabs />
+          {/* ⭐ 2. ToastProvider로 전체 화면을 감싸줍니다. */}
+          <ToastProvider>
+            {/* 상단 네비게이션 헤더 */}
+            <Header />
+            
+            {/* 헤더 바로 아래에 최근 방문 탭 배치 (PC에서만 보임) */}
+            <RecentTabs />
 
-          {/* 메인 페이지 콘텐츠 */}
-          {children}
+            {/* 메인 페이지 콘텐츠 */}
+            {children}
 
-          {/* ⭐ 2. 모든 콘텐츠가 그려진 후, 가장 마지막에 플로팅 챗 띄우기 */}
-          {/* <FloatingChat /> */}
+            {/* <FloatingChat /> */}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

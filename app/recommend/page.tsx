@@ -1,76 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
-import { debounce } from "lodash";
 
 const Icons = {
-  Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-  Sparkles: () => <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
-  X: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-  Refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  Refresh: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   External: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 };
 
-type RecommendedGame = {
-  id: number;
-  title: string;
-  image_url: string;
-  metacritic: number;
-  reason: string;
-  genres: string[];
-  purchase_url?: string; // 추가됨
-};
+const QUESTIONS = [
+  { id: "playTime", label: " 플레이 타임 (분량)", options: ["단판/단기 (3시간 미만)", "표준 볼륨 (15시간 내외)", "장기 몰입 (40시간 이상)"] },
+  { id: "energy", label: " 체감 난이도", options: ["쉬움 (부담없이 즐기기)", "보통 (적당한 도전)", "어려움 (하드코어)", "하드코어 (극한의 고난도)"] },
+  { id: "emotion", label: " 선호하는 경험", options: ["힐링", "아드레날린과 쾌감", "긴장감, 공포", "지적인 능력"] },
+  { id: "social", label: " 사회적 상호작용", options: ["철저하게 혼자", "느슨한 연대/협동", "친구와 왁자지껄"] },
+  { id: "aesthetic", label: " 아트 스타일", options: ["사실적인 그래픽", "독창적인 카툰/동화", "레트로한 도트/픽셀"] }
+];
 
 export default function RecommendPage() {
-  const router = useRouter(); // router 추가
+  const router = useRouter();
   const [mode, setMode] = useState<"logic" | "sentence">("logic");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedGames, setSelectedGames] = useState<any[]>([]);
+  const [selections, setSelections] = useState<Record<string, string>>({});
   const [userInput, setUserInput] = useState("");
-  const [recommendations, setRecommendations] = useState<RecommendedGame[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false); // 리프레시 상태 추가
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchGames = async (query: string) => {
-    if (query.length < 2) { setSearchResults([]); return; }
-    const res = await fetch(`https://api.rawg.io/api/games?key=${process.env.NEXT_PUBLIC_RAWG_API_KEY}&search=${query}&page_size=5`);
-    const data = await res.json();
-    setSearchResults(data.results || []);
-  };
-
-  const debouncedSearch = useCallback(debounce(fetchGames, 500), []);
-
-  useEffect(() => { debouncedSearch(searchQuery); }, [searchQuery, debouncedSearch]);
-
-  const toggleGameSelection = (game: any) => {
-    if (selectedGames.find((g) => g.id === game.id)) {
-      setSelectedGames(selectedGames.filter((g) => g.id !== game.id));
-    } else if (selectedGames.length < 3) {
-      setSelectedGames([...selectedGames, game]);
-      setSearchQuery("");
-      setSearchResults([]);
-    }
-  };
-
-  // 기존 함수에 retry 인자를 추가했습니다.
   const handleGetRecommendation = async (retry = false) => {
     if (retry) setIsRefreshing(true);
-    else {
-      setIsLoading(true);
-      setRecommendations([]);
-    }
+    else { setIsLoading(true); setRecommendations([]); }
     
     try {
       const { data, error } = await supabase.functions.invoke("GameRecommend", {
-        body: { 
-          mode, 
-          selectedGames: selectedGames.map((g) => g.name), 
-          userInput: mode === "sentence" ? userInput : "",
-          isRetry: retry // 서버로 retry 여부 전송
-        },
+        body: { mode, selections, userInput, isRetry: retry },
       });
       if (error) throw error;
       setRecommendations(data.recommendations);
@@ -82,146 +44,79 @@ export default function RecommendPage() {
     }
   };
 
+  const isAllSelected = QUESTIONS.every(q => selections[q.id]);
+
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <main className="max-w-5xl mx-auto px-4 py-16">
         
-        {/* Header */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500 uppercase">
-            Discovery Engine
-          </h1>
+          <h1 className="text-4xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500 uppercase">Discovery Engine</h1>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="flex p-1.5 bg-muted/50 backdrop-blur-md rounded-2xl mb-12 max-w-[280px] mx-auto border border-border">
-          {(["logic", "sentence"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${mode === m ? "bg-card shadow-md text-primary" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {m === "logic" ? "취향 분석" : "자유 입력"}
-            </button>
-          ))}
-        </div>
+        <div className="bg-card border border-border rounded-[3rem] p-8 sm:p-12 shadow-xl mb-16">
+          <div className="flex p-1 bg-muted rounded-2xl mb-12 max-w-xs mx-auto border border-border">
+            {(["logic", "sentence"] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)} className={`flex-1 py-2 text-[11px] font-black rounded-xl transition-all uppercase tracking-widest ${mode === m ? "bg-card shadow-sm text-primary" : "text-muted-foreground"}`}>
+                {m === "logic" ? "맞춤 설정" : "자율 묘사"}
+              </button>
+            ))}
+          </div>
 
-        {/* Input Card */}
-        <div className="bg-card border border-border rounded-[2.5rem] p-8 sm:p-10 shadow-xl shadow-primary/5 mb-16">
           {mode === "logic" ? (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold tracking-tight">좋아했던 게임 3가지를 선택하세요</h2>
-                <span className="text-xs font-black px-3 py-1 bg-primary/10 text-primary rounded-full">{selectedGames.length} / 3</span>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground"><Icons.Search /></div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="예: The Witcher 3, Hades..."
-                  className="w-full pl-14 pr-6 py-5 bg-muted/50 border-none rounded-2xl focus:ring-2 ring-primary transition-all font-medium"
-                />
-                {searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-3 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden divide-y divide-border">
-                    {searchResults.map((game) => (
-                      <div key={game.id} onClick={() => toggleGameSelection(game)} className="flex items-center gap-4 p-4 hover:bg-muted cursor-pointer transition-colors">
-                        <img src={game.background_image} alt="" className="w-14 h-14 rounded-xl object-cover shadow-sm" />
-                        <span className="font-bold text-sm">{game.name}</span>
-                      </div>
+            <div className="space-y-12">
+              {QUESTIONS.map((q) => (
+                <div key={q.id} className="space-y-5">
+                  <h3 className="font-black text-xs text-muted-foreground uppercase tracking-widest px-2">{q.label}</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {q.options.map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => setSelections(prev => ({ ...prev, [q.id]: opt }))}
+                        className={`px-6 py-3.5 rounded-2xl text-xs font-bold transition-all border-2 ${selections[q.id] === opt ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-muted/20 border-transparent hover:border-border text-muted-foreground"}`}
+                      >
+                        {opt}
+                      </button>
                     ))}
                   </div>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {selectedGames.map((game) => (
-                  <div key={game.id} className="flex items-center gap-2 bg-card border border-primary/30 text-primary px-4 py-2 rounded-xl shadow-sm animate-in zoom-in duration-300">
-                    <span className="text-sm font-bold">{game.name}</span>
-                    <button onClick={() => toggleGameSelection(game)} className="hover:text-rose-500"><Icons.X /></button>
-                  </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold tracking-tight text-center">원하는 플레이 경험을 자유롭게 묘사해주세요</h2>
-              <textarea
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                placeholder="예: 사이버펑크적인 분위기 속에서 깊은 서사를 즐길 수 있는 고난도 액션 게임을 찾고 있어."
-                className="w-full h-40 p-6 bg-muted/50 border-none rounded-3xl focus:ring-2 ring-primary transition-all text-base leading-relaxed resize-none"
-              />
-            </div>
+            <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="원하는 게임의 분위기나 특징을 자유롭게 묘사해주세요." className="w-full h-48 p-8 bg-muted/50 border-none rounded-[2.5rem] focus:ring-2 ring-primary transition-all text-base resize-none" />
           )}
-          <button
-            onClick={() => handleGetRecommendation(false)}
-            disabled={isLoading || (mode === "logic" && selectedGames.length < 1) || (mode === "sentence" && !userInput)}
-            className="w-full mt-10 py-5 bg-primary text-primary-foreground font-black rounded-3xl hover:scale-[1.01] active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
-          >
-            {isLoading ? "분석 리포트 작성 중..." : "맞춤 추천 리포트 생성"}
+
+          <button onClick={() => handleGetRecommendation(false)} disabled={isLoading || (mode === "logic" && !isAllSelected)} className="w-full mt-16 py-6 bg-primary text-primary-foreground font-black rounded-[2rem] hover:scale-[1.01] transition-all shadow-xl shadow-primary/30 disabled:opacity-50 uppercase tracking-widest">
+            {isLoading ? "분석중" : "추천 받기"}
           </button>
         </div>
 
-        {/* Results */}
         {recommendations.length > 0 && (
-          <div className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <div className="flex items-center justify-between px-2">
-              <h2 className="text-2xl font-black tracking-tight">AI 평론가가 선정한 발견</h2>
-              {/* 다른 게임 추천받기 버튼 추가 */}
-              <button 
-                onClick={() => handleGetRecommendation(true)} 
-                disabled={isRefreshing}
-                className="flex items-center gap-2 text-xs font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10 hover:bg-primary/10 transition-all"
-              >
+          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+            <div className="flex items-center justify-between px-4">
+              <h2 className="text-2xl font-black tracking-tight">AI 큐레이션 리포트</h2>
+              <button onClick={() => handleGetRecommendation(true)} disabled={isRefreshing} className="flex items-center gap-2 text-[11px] font-black text-primary bg-primary/5 px-6 py-3 rounded-full border border-primary/20 hover:bg-primary/10 transition-all active:scale-95">
                 <div className={isRefreshing ? "animate-spin" : ""}><Icons.Refresh /></div>
-                {isRefreshing ? "새로운 발견 검색 중..." : "다른 게임 더 보기"}
+                {isRefreshing ? "다른 게임 찾는 중..." : "다른 리스트 추천받기"}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-10">
+            <div className="grid grid-cols-1 gap-12">
               {recommendations.map((game) => (
-                <div key={game.id} className="group bg-card border border-border rounded-[3rem] overflow-hidden flex flex-col lg:flex-row hover:border-primary/50 transition-all duration-500 shadow-sm hover:shadow-2xl">
-                  <div className="w-full lg:w-[45%] h-64 lg:h-auto overflow-hidden">
+                <div key={game.id} className="group bg-card border border-border rounded-[3.5rem] overflow-hidden flex flex-col lg:flex-row hover:border-primary/40 transition-all duration-700 shadow-sm hover:shadow-2xl">
+                  <div className="w-full lg:w-[42%] h-80 lg:h-auto overflow-hidden">
                     <img src={game.image_url} alt={game.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                   </div>
-                  <div className="p-8 lg:p-12 flex-1 flex flex-col justify-center">
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 className="text-2xl lg:text-3xl font-black text-foreground mb-3 tracking-tighter">{game.title}</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {game.genres.slice(0, 3).map((genre) => (
-                            <span key={genre} className="text-[10px] font-black text-primary/70 bg-primary/5 px-2.5 py-1 rounded-lg border border-primary/10 uppercase tracking-widest">{genre}</span>
-                          ))}
-                        </div>
-                      </div>
-                      {game.metacritic && (
-                        <div className="flex flex-col items-center justify-center bg-card border-2 border-emerald-500/20 rounded-2xl p-3 min-w-[70px]">
-                          <span className="text-[9px] font-black text-emerald-500/60 uppercase tracking-tighter mb-1">Critic</span>
-                          <span className="text-2xl font-black text-emerald-500">{game.metacritic}</span>
-                        </div>
-                      )}
+                  <div className="p-10 lg:p-16 flex-1 flex flex-col justify-center">
+                    <div className="flex justify-between items-start mb-8">
+                      <h3 className="text-3xl lg:text-4xl font-black tracking-tighter leading-tight">{game.title}</h3>
+                      {game.metacritic && <div className="bg-emerald-500/10 text-emerald-500 px-4 py-2 rounded-2xl text-2xl font-black border border-emerald-500/20">{game.metacritic}</div>}
                     </div>
-                    <div className="relative mb-8">
-                      <p className="text-base lg:text-lg text-muted-foreground leading-relaxed font-medium italic border-l-4 border-primary/40 pl-6 py-2">
-                        {game.reason}
-                      </p>
-                    </div>
-                    {/* 버튼 그룹 추가 */}
-                    <div className="flex flex-wrap gap-3">
-                      <button 
-                        onClick={() => router.push(`/review/${game.id}`)}
-                        className="px-6 py-3 bg-muted hover:bg-muted/80 text-xs font-bold rounded-2xl transition-all"
-                      >
-                        커뮤니티 평론
-                      </button>
-                      <a 
-                        href={game.purchase_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="px-6 py-3 bg-primary text-primary-foreground text-xs font-black rounded-2xl transition-all flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105"
-                      >
-                        <Icons.External /> 지금 플레이하기
+                    <p className="text-lg text-muted-foreground leading-relaxed border-l-4 border-primary/30 pl-8 py-2 mb-10 italic font-medium">{game.reason}</p>
+                    <div className="flex flex-wrap gap-4">
+                      <button onClick={() => router.push(`/review/${game.id}`)} className="px-8 py-4 bg-muted hover:bg-muted/80 text-[11px] font-black rounded-2xl transition-all border border-border tracking-widest uppercase">커뮤니티 리뷰</button>
+                      <a href={game.purchase_url} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-primary text-primary-foreground text-[11px] font-black rounded-2xl transition-all flex items-center gap-3 shadow-lg shadow-primary/20 hover:scale-105 tracking-widest uppercase">
+                        <Icons.External /> 플레이하러 가기
                       </a>
                     </div>
                   </div>

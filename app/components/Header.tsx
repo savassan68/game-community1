@@ -8,7 +8,6 @@ import ThemeToggle from "./ThemeToggle";
 const Icons = {
   Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
   Close: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-  // ⭐ 알림 삭제용 작은 X 아이콘 추가
   XMark: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
   User: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
   Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
@@ -50,6 +49,7 @@ export default function Header() {
   const [isNotiMenuOpen, setIsNotiMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [headerSearch, setHeaderSearch] = useState("");
+  const [notiTab, setNotiTab] = useState<"noti" | "message">("noti");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -85,7 +85,7 @@ export default function Header() {
   }, [pathname]);
 
   const fetchNotifications = async (userId: string) => {
-    const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
+    const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
     if (!error && data) setNotifications(data);
   };
 
@@ -98,37 +98,47 @@ export default function Header() {
     router.push(noti.link);
   };
 
-  // ⭐ 알림 삭제 함수
   const handleDeleteNoti = async (e: React.MouseEvent, notiId: number) => {
-    e.stopPropagation(); // 부모(알림 읽기/이동) 클릭 이벤트 막기
-    
-    // UI에서 즉시 삭제 (빠른 반응성)
+    e.stopPropagation();
     setNotifications(prev => prev.filter(n => n.id !== notiId));
-    
-    // DB에서 삭제
-    const { error } = await supabase.from('notifications').delete().eq('id', notiId);
-    if (error) console.error("알림 삭제 실패:", error);
+    await supabase.from('notifications').delete().eq('id', notiId);
   };
 
-  const handleLogoClick = () => router.push("/");
+  const handleMarkAllAsReadFiltered = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const unreadIds = filteredNotifications.filter(n => !n.is_read).map(n => n.id);
+    if (unreadIds.length === 0) return;
+    setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: true } : n));
+    await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
+  };
+
   const handleUserMenuClick = (tab: string) => {
     setIsUserMenuOpen(false);
     router.push(`/mypage?tab=${tab}`);
   };
 
+  const onSearchSubmit = () => {
+    if (!headerSearch.trim()) return;
+    router.push(`/search?q=${encodeURIComponent(headerSearch.trim())}`);
+    setHeaderSearch("");
+  };
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadNotiCount = notifications.filter(n => !n.is_read && n.type !== "message").length;
+  const unreadMsgCount = notifications.filter(n => !n.is_read && n.type === "message").length;
+  const filteredNotifications = notifications.filter(n => notiTab === "message" ? n.type === "message" : n.type !== "message");
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center relative">
         
-        <button onClick={handleLogoClick} className="text-2xl font-extrabold font-sans text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 relative z-50 transition-colors">
+        <button onClick={() => router.push("/")} className="text-2xl font-extrabold font-sans text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 relative z-50 transition-colors">
           GameSeed
         </button>
 
         <nav className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8 text-sm font-bold">
           {NAV_MENUS.map((menu) => (
-            <button key={menu.path} onClick={() => router.push(`/${menu.path}`)} className="text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            <button key={menu.path} onClick={() => router.push(`/${menu.path}`)} className={`transition-colors ${pathname === `/${menu.path}` ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}>
               {menu.label}
             </button>
           ))}
@@ -137,17 +147,13 @@ export default function Header() {
         <div className="flex items-center gap-2 sm:gap-4 relative z-50">
           
           <div className="hidden sm:flex relative items-center">
-            <div className="absolute left-3 text-slate-400"><Icons.Search /></div>
+            <div className="absolute left-3 text-slate-400 pointer-events-none"><Icons.Search /></div>
             <input
               type="text"
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && headerSearch.trim()) {
-                  router.push(`/review?search=${encodeURIComponent(headerSearch.trim())}`);
-                }
-              }}
-              placeholder="게임 검색..."
+              onKeyDown={(e) => { if (e.key === 'Enter') onSearchSubmit(); }}
+              placeholder="통합 검색..."
               className="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent dark:border-slate-700 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-700 focus:border-indigo-400 transition-all duration-300 outline-none w-32 focus:w-48 shadow-sm"
             />
           </div>
@@ -158,63 +164,33 @@ export default function Header() {
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-3">
                 <div className="relative">
-                  <button 
-                    onClick={() => { setIsNotiMenuOpen(!isNotiMenuOpen); setIsUserMenuOpen(false); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all relative ${isNotiMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}
-                  >
+                  <button onClick={() => { setIsNotiMenuOpen(!isNotiMenuOpen); setIsUserMenuOpen(false); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all relative ${isNotiMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
                     <Icons.Bell />
-                    {unreadCount > 0 && (
-                      <span className="absolute top-0 right-0 flex h-2.5 w-2.5">
-                        {/* ⭐ 빨간색(rose)에서 인디고(indigo)로 변경 */}
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500 border-2 border-white dark:border-slate-900"></span>
-                      </span>
-                    )}
+                    {unreadCount > 0 && <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-rose-500 border-2 border-white dark:border-slate-900"></span>}
                   </button>
 
                   {isNotiMenuOpen && (
-                    <div className="absolute right-0 mt-3 w-[340px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                      <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                        <p className="text-xs font-extrabold text-slate-700 dark:text-slate-200">알림</p>
-                        {/* ⭐ 배지 색상도 인디고 계열로 변경 */}
-                        {unreadCount > 0 && <span className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCount}개 안 읽음</span>}
+                    <div className="fixed left-4 right-4 top-[72px] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-3 w-auto sm:w-[340px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
+                      <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold">
+                        <button onClick={() => setNotiTab("noti")} className={`flex-1 py-3 text-center transition-colors relative ${notiTab === "noti" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600" : "text-slate-500"}`}>알림 {unreadNotiCount > 0 && `(${unreadNotiCount})`}</button>
+                        <button onClick={() => setNotiTab("message")} className={`flex-1 py-3 text-center transition-colors relative ${notiTab === "message" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600" : "text-slate-500"}`}>쪽지 {unreadMsgCount > 0 && `(${unreadMsgCount})`}</button>
+                        <button onClick={handleMarkAllAsReadFiltered} className="px-4 py-3 text-slate-400 hover:text-indigo-500 transition-colors border-l border-slate-200 dark:border-slate-700">모두 읽음</button>
                       </div>
-                      <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
-                        {notifications.length > 0 ? (
+                      <div className="max-h-[350px] overflow-y-auto custom-scrollbar bg-card">
+                        {filteredNotifications.length > 0 ? (
                           <ul className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                            {notifications.map((noti) => (
-                              <li 
-                                key={noti.id} 
-                                onClick={() => handleNotiClick(noti)} 
-                                className={`group px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 flex gap-3 items-center ${noti.is_read ? 'opacity-60' : 'bg-indigo-50/30 dark:bg-indigo-900/10'}`}
-                              >
-                                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${noti.type === 'message' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400'}`}>
-                                  {noti.type === 'message' ? <Icons.Mail /> : <Icons.MessageCircle />}
-                                </div>
+                            {filteredNotifications.map((noti) => (
+                              <li key={noti.id} onClick={() => handleNotiClick(noti)} className={`px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 flex gap-3 items-center ${noti.is_read ? 'opacity-50' : 'bg-indigo-50/20 dark:bg-indigo-900/10'}`}>
                                 <div className="flex-1 min-w-0 pr-1">
                                   <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-snug"><span className="font-extrabold">{noti.actor_nickname}</span>님이 {noti.message}</p>
                                   <p className="text-[10px] text-slate-400 mt-1 font-bold">{new Date(noti.created_at).toLocaleDateString()}</p>
                                 </div>
-                                
-                                {/* ⭐ 우측: 안 읽음 도트 + 삭제 버튼 */}
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  {/* 빨간색 도트를 인디고로 변경 */}
-                                  {!noti.is_read && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>}
-                                  
-                                  {/* 삭제 버튼 (평소엔 연하게, 마우스 올리면 약간 강조) */}
-                                  <button
-                                    onClick={(e) => handleDeleteNoti(e, noti.id)}
-                                    className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-full transition-all"
-                                    aria-label="알림 삭제"
-                                  >
-                                    <Icons.XMark />
-                                  </button>
-                                </div>
+                                <button onClick={(e) => handleDeleteNoti(e, noti.id)} className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors"><Icons.XMark /></button>
                               </li>
                             ))}
                           </ul>
                         ) : (
-                          <div className="py-10 text-center flex flex-col items-center"><div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-3"><Icons.Bell /></div><p className="text-xs font-bold text-slate-400">새로운 알림이 없습니다.</p></div>
+                          <div className="py-12 text-center text-xs font-bold text-slate-400">내역이 없습니다.</div>
                         )}
                       </div>
                     </div>
@@ -222,28 +198,24 @@ export default function Header() {
                 </div>
 
                 <div className="relative">
-                  <button 
-                    onClick={() => { setIsUserMenuOpen(!isUserMenuOpen); setIsNotiMenuOpen(false); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isUserMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}
-                  >
+                  <button onClick={() => { setIsUserMenuOpen(!isUserMenuOpen); setIsNotiMenuOpen(false); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isUserMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
                     <Icons.UserIconLg />
                   </button>
-
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-3 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-[60] animate-in fade-in zoom-in-95 duration-200">
+                    <div className="fixed left-4 right-4 top-[72px] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-3 w-auto sm:w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-[60] animate-in fade-in zoom-in-95 duration-200 origin-top">
                       <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">내 계정</p>
                         <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{user.email}</p>
                       </div>
                       <div className="py-1">
-                        <button onClick={() => handleUserMenuClick("info")} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors"><Icons.User /> 마이페이지</button>
-                        <button onClick={() => handleUserMenuClick("scraps")} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors"><Icons.Bookmark /> 나의 스크랩</button>
-                        <button onClick={() => handleUserMenuClick("posts")} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors"><Icons.FileText /> 작성글</button>
-                        <button onClick={() => handleUserMenuClick("comments")} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors"><Icons.MessageCircle /> 작성댓글</button>
-                        <button onClick={() => handleUserMenuClick("messages")} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors"><Icons.Mail /> 쪽지함</button>
+                        <button onClick={() => handleUserMenuClick("info")} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600"><Icons.User /> 마이페이지</button>
+                        <button onClick={() => handleUserMenuClick("scraps")} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600"><Icons.Bookmark /> 나의 스크랩</button>
+                        <button onClick={() => handleUserMenuClick("posts")} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600"><Icons.FileText /> 작성글</button>
+                        <button onClick={() => handleUserMenuClick("comments")} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600"><Icons.MessageCircle /> 작성댓글</button>
+                        <button onClick={() => handleUserMenuClick("messages")} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600"><Icons.Mail /> 쪽지함</button>
                       </div>
                       <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
-                      <button onClick={async () => { await supabase.auth.signOut(); setIsUserMenuOpen(false); router.refresh(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"><Icons.Logout /> 로그아웃</button>
+                      <button onClick={async () => { await supabase.auth.signOut(); setIsUserMenuOpen(false); router.refresh(); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"><Icons.Logout /> 로그아웃</button>
                     </div>
                   )}
                 </div>
@@ -251,7 +223,7 @@ export default function Header() {
             ) : (
               <div className="flex gap-2">
                 <button onClick={() => router.push("/auth/login")} className="text-sm font-semibold text-slate-600 dark:text-slate-300 px-2 sm:px-3 py-2 hover:text-indigo-600 transition-colors">로그인</button>
-                <button onClick={() => router.push("/auth/signup")} className="text-sm font-semibold text-white bg-indigo-600 px-3 sm:px-4 py-2 rounded-full hover:bg-indigo-700 transition-colors shadow-md whitespace-nowrap">회원가입</button>
+                <button onClick={() => router.push("/auth/signup")} className="text-sm font-semibold text-white bg-indigo-600 px-3 sm:px-4 py-2 rounded-full hover:bg-indigo-700 shadow-md">회원가입</button>
               </div>
             )}
           </div>
@@ -263,20 +235,18 @@ export default function Header() {
       </div>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xl flex flex-col font-bold text-sm z-40">
+        <div className="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xl flex flex-col font-bold text-sm z-40 animate-in slide-in-from-top-4 duration-200">
+          <div className="p-4 border-b border-slate-50 dark:border-slate-800">
+             <input type="text" value={headerSearch} onChange={(e) => setHeaderSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onSearchSubmit(); }} placeholder="통합 검색..." className="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-sm font-bold" />
+          </div>
           {NAV_MENUS.map((menu) => (
             <button key={menu.path} onClick={() => router.push(`/${menu.path}`)} className="p-4 text-left text-slate-600 dark:text-slate-300 border-b border-slate-50 dark:border-slate-800">{menu.label}</button>
           ))}
           <div className="p-5 bg-slate-50 dark:bg-slate-800/50">
             {user ? (
               <div className="flex flex-col gap-3">
-                <div className="text-[11px] font-bold text-slate-400 mb-1 pb-2 border-b border-slate-200 dark:border-slate-700">{user.email}</div>
                 <button onClick={() => handleUserMenuClick("info")} className="flex items-center gap-2 py-1.5"><Icons.User /> 마이페이지</button>
-                <button onClick={() => handleUserMenuClick("scraps")} className="flex items-center gap-2 py-1.5"><Icons.Bookmark /> 나의 스크랩</button>
-                <button onClick={() => handleUserMenuClick("posts")} className="flex items-center gap-2 py-1.5"><Icons.FileText /> 작성글</button>
-                <button onClick={() => handleUserMenuClick("comments")} className="flex items-center gap-2 py-1.5"><Icons.MessageCircle /> 작성댓글</button>
                 <button onClick={() => handleUserMenuClick("messages")} className="flex items-center gap-2 py-1.5"><Icons.Mail /> 쪽지함</button>
-                <div className="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
                 <button onClick={async () => { await supabase.auth.signOut(); router.refresh(); }} className="flex items-center gap-2 text-rose-500 py-1.5"><Icons.Logout /> 로그아웃</button>
               </div>
             ) : (

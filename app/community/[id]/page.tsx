@@ -5,16 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import supabase from "../../../lib/supabaseClient"; 
 import CommentForm from "../../components/CommentForm";
 import CommentList from "../../components/CommentList";
+// ⭐ layout.tsx와 연결된 중앙 관리 토스트 훅 불러오기
+import { useToast } from "../../components/ToastProvider"; 
 
-// 모든 아이콘 유지
+// 아이콘 모음 (기존 동일)
 const Icons = {
   Heart: ({ filled }: { filled?: boolean }) => (
-    <svg className={`w-5 h-5 transition-colors ${filled ? "text-primary fill-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-    </svg>
+    <svg className={`w-5 h-5 transition-colors ${filled ? "text-primary fill-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
   ),
   Eye: () => <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-  Message: () => <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
   Share: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>,
   ArrowLeft: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
   Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
@@ -23,26 +22,8 @@ const Icons = {
   Alert: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
 };
 
-interface Post {
-  id: number;
-  title: string;
-  content: string;
-  author: string;
-  user_id?: string;
-  views: number;
-  likes: number;
-  created_at?: string;
-  category?: string;
-}
-
-interface Comment {
-  id: number;
-  post_id: number;
-  user_id: string;
-  nickname: string;
-  content: string;
-  created_at: string;
-}
+interface Post { id: number; title: string; content: string; author: string; user_id?: string; views: number; likes: number; created_at?: string; category?: string; }
+interface Comment { id: number; post_id: number; user_id: string; nickname: string; content: string; created_at: string; }
 
 function timeAgo(dateString?: string) {
   if (!dateString) return "";
@@ -63,6 +44,9 @@ const getCategoryLabel = (cat?: string) => {
 export default function DetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  
+  // ⭐ Context에서 함수 꺼내오기 (기존의 지저분했던 toastMsg, showToast 관련 State 전부 삭제됨!)
+  const { triggerToast } = useToast();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -70,26 +54,12 @@ export default function DetailPage() {
   const [currentUserNickname, setCurrentUserNickname] = useState<string>("익명");
   const [loading, setLoading] = useState(true);
 
-  const [toastMsg, setToastMsg] = useState("");
-  const [showToast, setShowToast] = useState(false);
-
-  // ⭐ 통합 신고 상태 관리
+  // 통합 신고 상태 관리
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
-  const [reportTarget, setReportTarget] = useState<{
-    type: 'post' | 'comment';
-    id: number | string;
-    author: string;
-    content: string;
-  } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ type: 'post' | 'comment'; id: number | string; author: string; content: string; } | null>(null);
 
   const viewUpdated = useRef(false);
-
-  const triggerToast = (msg: string) => {
-    setToastMsg(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2500);
-  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -116,7 +86,6 @@ export default function DetailPage() {
     if (!error && data) setComments(data as Comment[]);
   };
 
-  // ⭐ 핵심: 통합 신고 함수 (자식 컴포넌트인 CommentList와 완벽하게 형식을 맞춤)
   const handleReportOpen = (type: 'post' | 'comment', targetId: number | string, author: string, content: string) => {
     if (!currentUserId) return triggerToast("로그인이 필요합니다.");
     setReportTarget({ type, id: targetId, author, content });
@@ -125,7 +94,6 @@ export default function DetailPage() {
 
   const submitReport = async () => {
     if (!reportTarget || !reportReason.trim()) return triggerToast("신고 사유를 입력해주세요.");
-
     try {
       const { error } = await supabase.from("reports").insert({
         reporter: currentUserNickname,
@@ -146,7 +114,6 @@ export default function DetailPage() {
     }
   };
 
-  // 추천, 공유, 삭제 로직 등은 기존 유지
   const handleLike = async () => {
     if (!currentUserId) return triggerToast("로그인이 필요합니다.");
     const { data, error } = await supabase.rpc("toggle_like", { p_post_id: Number(id), p_user_id: currentUserId });
@@ -182,14 +149,6 @@ export default function DetailPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6">
-      
-      {/* 토스트 */}
-      <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 pointer-events-none ${showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-        <div className="bg-slate-800 text-white px-5 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2">
-          {toastMsg}
-        </div>
-      </div>
-
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <button onClick={() => router.push("/community")} className="flex items-center gap-1 text-muted-foreground hover:text-primary text-sm font-bold transition-colors">
@@ -210,10 +169,7 @@ export default function DetailPage() {
             </span>
             <h1 className="text-2xl sm:text-3xl font-black mb-6 leading-tight">{post.title}</h1>
             <div className="flex items-center gap-3">
-              <div 
-                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold cursor-pointer"
-                onClick={() => post.user_id && router.push(`/user/${post.user_id}`)}
-              >
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold cursor-pointer" onClick={() => post.user_id && router.push(`/user/${post.user_id}`)}>
                 {post.author[0].toUpperCase()}
               </div>
               <div>
@@ -239,12 +195,7 @@ export default function DetailPage() {
             <div className="flex items-center gap-6 mt-6">
                <button onClick={() => triggerToast("주소가 복사되었습니다.")} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"><Icons.Share /> 공유</button>
                <button onClick={() => triggerToast("스크랩 되었습니다.")} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"><Icons.Bookmark /> 스크랩</button>
-               <button 
-                 onClick={() => handleReportOpen('post', post.id, post.author, post.content)} 
-                 className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"
-               >
-                 <Icons.Alert /> 신고
-               </button>
+               <button onClick={() => handleReportOpen('post', post.id, post.author, post.content)} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"><Icons.Alert /> 신고</button>
             </div>
           </div>
         </article>
@@ -253,13 +204,7 @@ export default function DetailPage() {
           <h3 className="text-lg font-bold mb-6 flex items-center gap-2">댓글 <span className="text-primary">{comments.length}</span></h3>
           <CommentForm postId={Number(id)} userId={currentUserId} onCommentAdded={fetchComments} />
           <div className="mt-8 divide-y divide-border">
-            <CommentList 
-              comments={comments} 
-              currentUserId={currentUserId} 
-              onCommentUpdated={fetchComments} 
-              postId={Number(id)} 
-              onReport={handleReportOpen} 
-            />
+            <CommentList comments={comments} currentUserId={currentUserId} onCommentUpdated={fetchComments} postId={Number(id)} onReport={handleReportOpen} />
           </div>
         </div>
       </div>
@@ -269,18 +214,9 @@ export default function DetailPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden">
             <div className="p-6">
-              <h3 className="text-xl font-black text-foreground flex items-center gap-2 mb-2">
-                <span className="text-destructive"><Icons.Alert /></span> 
-                {reportTarget.type === 'post' ? '게시글' : '댓글'} 신고하기
-              </h3>
+              <h3 className="text-xl font-black text-foreground flex items-center gap-2 mb-2"><span className="text-destructive"><Icons.Alert /></span> {reportTarget.type === 'post' ? '게시글' : '댓글'} 신고하기</h3>
               <p className="text-xs text-muted-foreground mb-4">대상자: <span className="font-bold text-foreground">{reportTarget.author}</span></p>
-              <textarea 
-                value={reportReason} 
-                onChange={(e) => setReportReason(e.target.value)} 
-                placeholder="신고 사유를 상세히 적어주세요..." 
-                className="w-full h-32 p-4 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-destructive/50 outline-none resize-none transition-all"
-                autoFocus
-              />
+              <textarea value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="신고 사유를 상세히 적어주세요..." className="w-full h-32 p-4 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-destructive/50 outline-none resize-none transition-all" autoFocus />
             </div>
             <div className="bg-muted/30 p-4 flex gap-3 justify-end border-t border-border">
               <button onClick={() => setIsReportModalOpen(false)} className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground">취소</button>
@@ -289,6 +225,8 @@ export default function DetailPage() {
           </div>
         </div>
       )}
+      
+      {/* ⭐ 삭제됨: 하단에 있던 fixed bottom-12 토스트 UI 코드 싹 지웠습니다! 이제 ToastProvider가 대신 띄워줍니다. */}
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import supabase from "@/lib/supabaseClient";
+// ⭐ 1. 토스트 훅 불러오기
+import { useToast } from "./ToastProvider"; // 경로에 맞게 수정해주세요!
 
 interface CommentFormProps {
   postId: number;
@@ -20,15 +22,18 @@ export default function CommentForm({
 }: CommentFormProps) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // ⭐ 2. 토스트 함수 꺼내기
+  const { triggerToast } = useToast();
 
   const submitComment = async () => {
-    if (!userId) return alert("댓글을 작성하려면 로그인해야 합니다.");
-    if (!content.trim()) return alert("댓글 내용을 입력해주세요.");
+    // ⭐ 3. alert 대신 토스트로 변경
+    if (!userId) return triggerToast("로그인이 필요합니다.");
+    if (!content.trim()) return triggerToast("댓글 내용을 입력해주세요.");
 
     setLoading(true);
 
     try {
-      // 1. 내 정보(닉네임) 가져오기
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("nickname")
@@ -37,7 +42,6 @@ export default function CommentForm({
         
       const myNickname = profile?.nickname || "익명 유저";
 
-      // 2. 댓글 DB에 등록하기
       const { error: insertError } = await supabase.from("comments").insert({
         post_id: postId,
         user_id: userId,
@@ -103,9 +107,13 @@ export default function CommentForm({
       setContent("");
       onCommentAdded();
       
+      // ⭐ 4. 성공 알림 (선택사항)
+      triggerToast(parentId ? "답글이 등록되었습니다." : "댓글이 등록되었습니다.");
+      
     } catch (error) {
       console.error("댓글 등록 오류 상세:", error);
-      alert("댓글 등록 중 문제가 발생했습니다. 관리자에게 문의하세요.");
+      // ⭐ 5. 에러 알림도 토스트로!
+      triggerToast("등록 중 문제가 발생했습니다.");
     } finally {
       setLoading(false);
     }

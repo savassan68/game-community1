@@ -279,7 +279,7 @@ export default function ReportsPage() {
                     )}
                     {report.link && (
                       <a href={report.link} target="_blank" className="text-[11px] font-bold text-blue-600 hover:underline">
-                        🔗 문제의 페이지 열기
+                        🔗 신고 접수된 페이지 열기
                       </a>
                     )}
                   </td>

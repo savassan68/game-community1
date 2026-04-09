@@ -145,9 +145,14 @@ function MyPageContent() {
       const { data: scrapsData } = await supabase.from("scraps").select("*, community(id, title, likes, created_at)").eq("user_id", session.user.id).order("created_at", { ascending: false });
       if (scrapsData) setMyScraps(scrapsData);
 
-      // ⭐ 찜한 게임 리스트 가져오기 (게임 정보 조인)
-      const { data: bookmarksData } = await supabase.from("game_bookmarks").select("*, games(id, title, image_url)").eq("user_id", session.user.id).order("created_at", { ascending: false });
-      if (bookmarksData) setMyBookmarks(bookmarksData);
+      // ⭐ 추천(찜)한 게임 리스트 가져오기 (게임 정보 조인)
+const { data: bookmarksData } = await supabase
+  .from("game_recommends") // ✅ 여기를 수정했습니다!
+  .select("*, games(id, title, image_url)")
+  .eq("user_id", session.user.id)
+  .order("created_at", { ascending: false });
+
+if (bookmarksData) setMyBookmarks(bookmarksData);
 
     } catch (error: any) {
       console.error("데이터 로딩 실패:", error.message);
