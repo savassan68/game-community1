@@ -25,7 +25,6 @@ interface CommentListProps {
   currentUserId: string | null;
   onCommentUpdated: () => void;
   postId: number;
-  // ⭐ 부모의 handleReportOpen 함수와 형식을 완벽히 맞췄습니다.
   onReport: (type: 'post' | 'comment', id: number | string, author: string, content: string) => void;
 }
 
@@ -123,7 +122,6 @@ export default function CommentList({
               </button>
             )}
 
-            {/* ⭐ 수정됨: 첫 번째 인자로 'comment'를 명시적으로 넘깁니다. */}
             {currentUserId && currentUserId !== c.user_id && (
               <button 
                 onClick={() => onReport('comment', c.id, c.nickname || "익명 사용자", c.content)}
@@ -135,12 +133,22 @@ export default function CommentList({
 
             {currentUserId === c.user_id && (
               <div className="flex gap-2">
-                <button onClick={() => startEdit(c)} className="text-[11px] font-bold text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100">수정</button>
-                <button onClick={() => deleteComment(c.id)} className="text-[11px] font-bold text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100">삭제</button>
+                <button 
+                  onClick={() => startEdit(c)} 
+                  className="text-[11px] font-bold text-muted-foreground/60 hover:text-primary transition-colors"
+                >
+                  수정
+                </button>
+                <button 
+                  onClick={() => deleteComment(c.id)} 
+                  className="text-[11px] font-bold text-muted-foreground/60 hover:text-destructive transition-colors"
+                >
+                  삭제
+                </button>
               </div>
             )}
           </div>
-        )}
+        )} {/* 이 부분이 실수로 지워졌었습니다! */}
 
         {replyingId === c.id && (
           <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">

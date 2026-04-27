@@ -15,6 +15,23 @@ interface ReportStat {
   created_at: string;
 }
 
+// ⭐ 공지사항 타입 추가
+interface NoticeStat {
+  id: number;
+  title: string;
+  target_page: string;
+  is_important: boolean;
+  created_at: string;
+}
+
+// target_page를 한글로 변환하는 함수
+const getPageLabel = (id: string) => {
+  const map: Record<string, string> = {
+    all: "전체", home: "홈", community: "커뮤니티", review: "평론", ai: "AI 추천", news: "뉴스"
+  };
+  return map[id] || "전체";
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -24,6 +41,7 @@ export default function AdminDashboard() {
   });
   const [recentUsers, setRecentUsers] = useState<UserStat[]>([]);
   const [recentReports, setRecentReports] = useState<ReportStat[]>([]);
+  const [recentNotices, setRecentNotices] = useState<NoticeStat[]>([]); // ⭐ 최근 공지 상태 추가
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,6 +79,15 @@ export default function AdminDashboard() {
 
       if (reportData) setRecentReports(reportData);
 
+      // 4. ⭐ 최근 공지사항 5건 가져오기
+      const { data: noticeData } = await supabase
+        .from('notices')
+        .select('id, title, target_page, is_important, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (noticeData) setRecentNotices(noticeData);
+
       setLoading(false);
     };
 
@@ -69,7 +96,7 @@ export default function AdminDashboard() {
 
   const formatSimpleDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
 
   if (loading) return <div className="p-10 font-bold text-muted-foreground">데이터를 분석 중...</div>;
@@ -86,11 +113,13 @@ export default function AdminDashboard() {
         <StatCard title="처리 대기 신고" value={`${stats.pendingReports}건`} color="bg-rose-500" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* ⭐ 3단 그리드로 변경하여 공지사항 섹션 추가 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
         {/* 최근 가입 유저 섹션 */}
         <div className="bg-card border border-border p-6 rounded-3xl shadow-sm">
           <h3 className="font-extrabold text-foreground mb-5 flex items-center gap-2">
-            🆕 최근 가입한 유저
+            🆕 최근 가입 유저
           </h3>
           <div className="space-y-3">
             {recentUsers.length > 0 ? recentUsers.map((u, i) => (
@@ -99,7 +128,7 @@ export default function AdminDashboard() {
                   <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs">
                     {(u.nickname || "U")[0].toUpperCase()}
                   </div>
-                  <span className="text-sm font-bold">{u.nickname || "익명 사용자"}</span>
+                  <span className="text-sm font-bold">{u.nickname || "익명"}</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground font-medium">{formatSimpleDate(u.created_at)}</span>
               </div>
@@ -128,6 +157,30 @@ export default function AdminDashboard() {
             )) : <p className="text-center py-10 text-xs text-muted-foreground">접수된 신고가 없습니다.</p>}
           </div>
         </div>
+
+        {/* ⭐ 최근 등록된 공지사항 섹션 */}
+        <div className="bg-card border border-border p-6 rounded-3xl shadow-sm">
+          <h3 className="font-extrabold text-indigo-500 mb-5 flex items-center gap-2">
+            📢 최근 등록된 공지
+          </h3>
+          <div className="space-y-3">
+            {recentNotices.length > 0 ? recentNotices.map((n, i) => (
+              <div key={i} className="flex items-start flex-col p-3 bg-indigo-50/30 dark:bg-indigo-900/5 rounded-2xl border border-indigo-100 dark:border-indigo-900/20">
+                <div className="flex items-center gap-2 mb-1.5 w-full">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${n.is_important ? "bg-rose-100 text-rose-600" : "bg-muted text-muted-foreground"}`}>
+                    {n.is_important ? "필독" : "일반"}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 text-[9px] font-bold truncate">
+                    {getPageLabel(n.target_page)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{formatSimpleDate(n.created_at)}</span>
+                </div>
+                <p className="text-sm font-bold truncate w-full">{n.title}</p>
+              </div>
+            )) : <p className="text-center py-10 text-xs text-muted-foreground">등록된 공지가 없습니다.</p>}
+          </div>
+        </div>
+
       </div>
     </div>
   );

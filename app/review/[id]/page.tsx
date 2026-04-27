@@ -456,18 +456,36 @@ export default function GameDetailPage() {
                 const isLong = cr.content.length > 120;
                 const isExpanded = expandedReviews[`critic_${cr.id}`];
                 return (
-                  <div key={cr.id} className="bg-slate-900 dark:bg-slate-950 p-5 rounded-3xl border border-border shadow-sm block group">
-                    <div className="flex justify-between items-center mb-2">
-                      <a href={cr.url} target="_blank" rel="noreferrer" className="text-sm font-bold text-amber-400 hover:text-amber-300 hover:underline transition-colors">{cr.outlet}</a>
-                      <span className="text-sm font-black bg-slate-800 px-2.5 py-1 rounded-lg text-white border border-slate-700">{cr.rating}</span>
+                  <div key={cr.id} className="bg-amber-50 dark:bg-amber-500/10 p-5 rounded-3xl border border-amber-200 dark:border-amber-500/20 shadow-sm block group transition-colors">
+                    <div className="flex justify-between items-center mb-3">
+                      <a href={cr.url} target="_blank" rel="noreferrer" className="text-sm font-bold text-amber-700 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 hover:underline transition-colors">
+                        {cr.outlet}
+                      </a>
+                      <span className="text-sm font-black bg-amber-500 px-3 py-1 rounded-lg text-white shadow-sm">
+                        {cr.rating}
+                      </span>
                     </div>
-                    <p className={`text-sm text-slate-300 mb-1 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>{cr.content}</p>
-                    {isLong && <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-400 hover:text-amber-300 mb-2 transition-colors">{isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}</button>}
-                    <div className="text-xs text-slate-500">by {cr.author}</div>
+                    <p className={`text-sm text-foreground/80 mb-2 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
+                      {cr.content}
+                    </p>
+                    {isLong && (
+                      <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:opacity-80 mb-2 transition-opacity">
+                        {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
+                      </button>
+                    )}
+                    <div className="text-xs text-muted-foreground font-medium">by {cr.author}</div>
                   </div>
                 );
               })}
-              {criticReviews.length > visibleCriticCount && <button onClick={() => setVisibleCriticCount(prev => prev + 5)} className="w-full py-3 mt-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-sm font-bold rounded-2xl transition-colors border border-slate-700">전문가 평론 더보기 ({visibleCriticCount} / {criticReviews.length}) ▼</button>}
+              
+              {criticReviews.length > visibleCriticCount && (
+                <button 
+                  onClick={() => setVisibleCriticCount(prev => prev + 5)} 
+                  className="w-full py-3 mt-4 bg-amber-100/50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-sm font-bold rounded-2xl transition-colors border border-amber-200 dark:border-amber-500/20"
+                >
+                  전문가 평론 더보기 ({visibleCriticCount} / {criticReviews.length}) ▼
+                </button>
+              )}
             </div>
           )}
         </div>

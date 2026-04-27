@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image"; // ⭐ Next.js Image 추가
 import { fetchGameMecaArticle } from "@/lib/gamemeca";
 
 type Props = {
@@ -14,12 +15,13 @@ const Icons = {
 export default async function NewsDetailPage({ searchParams }: Props) {
   const { url } = await searchParams;
 
+  // 에러 화면 1: 주소가 없을 때
   if (!url) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center transition-colors">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center transition-colors">
         <div className="text-6xl mb-4 opacity-50">📰</div>
-        <p className="text-xl font-bold text-foreground mb-6">기사 주소가 없습니다.</p>
-        <Link href="/news" className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-md hover:opacity-90 transition-all flex items-center gap-2">
+        <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">잘못된 접근입니다. 기사 주소가 없습니다.</p>
+        <Link href="/news" className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-all flex items-center gap-2">
           <Icons.ArrowLeft /> 뉴스 목록으로 돌아가기
         </Link>
       </div>
@@ -31,11 +33,12 @@ export default async function NewsDetailPage({ searchParams }: Props) {
   try {
     article = await fetchGameMecaArticle(url);
   } catch (error) {
+    // 에러 화면 2: 크롤링 실패 시
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center transition-colors">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center transition-colors">
         <div className="text-6xl mb-4 opacity-50">⚠️</div>
-        <p className="text-xl font-bold text-foreground mb-6">기사를 불러오지 못했습니다.</p>
-        <Link href="/news" className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-md hover:opacity-90 transition-all flex items-center gap-2">
+        <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">원본 사이트의 응답이 지연되고 있습니다.</p>
+        <Link href="/news" className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-all flex items-center gap-2">
           <Icons.ArrowLeft /> 뉴스 목록으로 돌아가기
         </Link>
       </div>
@@ -43,38 +46,38 @@ export default async function NewsDetailPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-10 px-4 sm:px-6 transition-colors duration-300 pb-32">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-10 px-4 sm:px-6 transition-colors duration-300 pb-32">
       <main className="max-w-4xl mx-auto">
         
         <div className="mb-8">
-          <Link href="/news" className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-primary transition-colors">
-            <Icons.ArrowLeft /> 뉴스 목록으로
+          <Link href="/news" className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+            <Icons.ArrowLeft /> Back to News
           </Link>
         </div>
 
-        <article className="bg-card rounded-3xl p-6 sm:p-12 shadow-sm border border-border transition-colors">
+        <article className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 sm:p-12 shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
           
-          <header className="mb-10 border-b border-border pb-8">
-            <h1 className="text-3xl sm:text-4xl font-black leading-tight text-foreground break-keep mb-6">
+          <header className="mb-10 border-b border-slate-100 dark:border-slate-800 pb-8">
+            <h1 className="text-3xl sm:text-4xl font-black leading-tight text-slate-800 dark:text-slate-100 break-keep mb-6">
               {article.title}
             </h1>
             
             <div className="flex flex-wrap items-center gap-4 text-sm font-bold mb-5">
-              <span className="bg-primary/10 text-primary px-2.5 py-1 rounded-lg">GameMeca</span>
-              <span className="text-muted-foreground">{article.createdAt || "날짜 정보 없음"}</span>
+              <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg uppercase tracking-wider">GameMeca</span>
+              <span className="text-slate-400">{article.createdAt || "날짜 정보 없음"}</span>
             </div>
 
-            {/* ⭐ 저작권/출처 명시를 위한 실제 URL 노출 박스 */}
-            <div className="w-full bg-muted/50 border border-border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden">
-              <span className="text-xs font-extrabold text-muted-foreground whitespace-nowrap flex items-center gap-1.5 flex-shrink-0">
+            {/* ⭐ 출처 명시 박스 */}
+            <div className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden">
+              <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 whitespace-nowrap flex items-center gap-1.5 flex-shrink-0">
                 <Icons.ExternalLink /> 기사 원문 출처
               </span>
-              <div className="h-px w-full sm:w-px sm:h-4 bg-border"></div>
+              <div className="h-px w-full sm:w-px sm:h-4 bg-slate-200 dark:bg-slate-700"></div>
               <a
                 href={article.articleUrl}
                 target="_blank"
-                rel="noreferrer"
-                className="text-sm font-medium text-primary hover:text-primary/80 hover:underline truncate"
+                rel="noopener noreferrer" // ⭐ 보안 속성 필수 추가
+                className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate"
                 title={article.articleUrl}
               >
                 {article.articleUrl}
@@ -82,28 +85,29 @@ export default async function NewsDetailPage({ searchParams }: Props) {
             </div>
           </header>
 
+          {/* ⭐ 썸네일 이미지 최적화 */}
           {article.imageUrl && (
-            <div className="mb-10 overflow-hidden rounded-2xl border border-border bg-muted shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div className="mb-10 relative w-full overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shadow-sm aspect-video">
+              <Image
                 src={article.imageUrl}
                 alt={article.title}
-                className="h-auto w-full object-cover"
+                fill
+                priority // 메인 이미지이므로 렌더링 우선순위 부여
+                sizes="(max-width: 768px) 100vw, 800px"
+                className="object-cover"
               />
             </div>
           )}
 
-          {article.summary && (
-            <div className="mb-10 bg-muted/50 border border-border p-6 sm:p-8 rounded-2xl relative">
-              <div className="absolute top-0 left-8 -translate-y-1/2 bg-card text-muted-foreground text-xl px-2">❝</div>
-              <p className="text-lg leading-relaxed text-foreground font-bold">
-                {article.summary}
-              </p>
-            </div>
-          )}
 
+          {/* 본문 내용 출력 (Tailwind Typography 적용) */}
           <div
-            className="prose prose-lg dark:prose-invert prose-slate max-w-none prose-img:rounded-2xl prose-img:shadow-md prose-headings:font-black prose-a:text-primary"
+            className="prose prose-lg max-w-none 
+            dark:prose-invert prose-slate 
+            prose-img:rounded-3xl prose-img:shadow-md prose-img:w-full prose-img:object-cover
+            prose-headings:font-black prose-headings:text-slate-800 dark:prose-headings:text-slate-100
+            prose-a:text-indigo-600 hover:prose-a:text-indigo-700 prose-a:font-bold prose-a:no-underline
+            prose-p:leading-loose prose-p:text-slate-600 dark:prose-p:text-slate-300"
             dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
           />
 

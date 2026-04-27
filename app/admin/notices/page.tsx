@@ -10,7 +10,19 @@ interface Notice {
   content: string;
   author: string;
   is_important: boolean;
+  target_page: string; 
 }
+
+const PAGE_OPTIONS = [
+  { id: "all", label: "전체 모든 페이지" },
+  { id: "home", label: "홈페이지 (메인)" },
+  { id: "community", label: "커뮤니티 페이지" },
+  { id: "review", label: "평론 페이지" },
+  { id: "ai", label: "AI 추천 페이지" },
+  { id: "news", label: "뉴스 페이지" },
+];
+
+const getPageLabel = (id: string) => PAGE_OPTIONS.find(p => p.id === id)?.label || "전체";
 
 const Icons = {
   Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
@@ -22,20 +34,19 @@ export default function NoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ⭐ 모달용 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [isImportant, setIsImportant] = useState(false);
+  const [targetPage, setTargetPage] = useState("all"); 
 
-  // 데이터 불러오기
   const fetchNotices = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("notices")
       .select("*")
-      .order("is_important", { ascending: false }) // 중요한 공지를 위로
-      .order("created_at", { ascending: false }); // 그 다음 최신순
+      .order("is_important", { ascending: false })
+      .order("created_at", { ascending: false });
     
     if (!error && data) setNotices(data);
     setIsLoading(false);
@@ -45,13 +56,12 @@ export default function NoticesPage() {
     fetchNotices();
   }, []);
 
-  // 공지사항 작성 (DB 전송)
+  // ⭐ 알림 전송 로직이 포함된 전체 submitNotice 함수
   const submitNotice = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
       return alert("제목과 내용을 모두 입력해주세요.");
     }
 
-    // 현재 로그인한 관리자 정보 가져오기 (이름 넣기 용도)
     const { data: { session } } = await supabase.auth.getSession();
     let authorName = "관리자";
     if (session?.user?.id) {
@@ -59,28 +69,53 @@ export default function NoticesPage() {
       if (profile) authorName = profile.nickname;
     }
 
-    const { error } = await supabase.from("notices").insert({
+    // 1. 공지사항 데이터 등록
+    const { error: noticeError } = await supabase.from("notices").insert({
       title: newTitle,
       content: newContent,
       author: authorName,
-      is_important: isImportant
+      is_important: isImportant,
+      target_page: targetPage
     });
 
-    if (error) {
+    if (noticeError) {
       alert("공지사항 등록 실패!");
-      console.error(error);
+      console.error(noticeError);
       return;
     }
 
-    alert("공지사항이 등록되었습니다.");
+    // 2. 전체 유저 목록 가져오기
+    const { data: users, error: usersError } = await supabase.from("user_profiles").select("id");
+    
+    if (usersError) {
+      console.error("유저 목록 조회 실패:", usersError);
+    } else if (users && users.length > 0) {
+      // 3. 삽입할 알림 데이터 배열 생성
+      const notificationPayloads = users.map((u) => ({
+        user_id: u.id,
+        type: "notice", // 알림 타입을 notice로 설정
+        actor_nickname: "시스템",
+        message: newTitle, // 공지 제목을 알림 내용으로 사용
+        link: "/notices",
+      }));
+
+      // 4. Supabase 알림 테이블에 일괄(Bulk) 삽입
+      const { error: notiError } = await supabase.from("notifications").insert(notificationPayloads);
+      
+      if (notiError) {
+        console.error("알림 일괄 전송 에러:", notiError);
+      }
+    }
+
+    alert("공지사항이 등록되고 모든 유저에게 알림이 전송되었습니다!");
     setIsModalOpen(false);
     setNewTitle("");
     setNewContent("");
     setIsImportant(false);
-    fetchNotices(); // 목록 새로고침
+    setTargetPage("all");
+    fetchNotices();
   };
 
-  // 공지사항 삭제
   const deleteNotice = async (id: number) => {
     if (!confirm("정말 이 공지사항을 삭제하시겠습니까?")) return;
     const { error } = await supabase.from("notices").delete().eq("id", id);
@@ -99,11 +134,10 @@ export default function NoticesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* 헤더 및 작성 버튼 */}
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-black text-gray-800 dark:text-gray-100 tracking-tight">📢 공지사항 관리</h2>
-          <p className="text-sm text-muted-foreground mt-1">유저들에게 보여질 전체 공지사항을 작성하고 관리합니다.</p>
+          <p className="text-sm text-muted-foreground mt-1">각 화면(페이지)별로 보여질 공지사항을 관리합니다.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -113,12 +147,12 @@ export default function NoticesPage() {
         </button>
       </div>
 
-      {/* 공지사항 목록 */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900/80 border-b border-gray-100 dark:border-gray-700">
             <tr>
               <th className="px-6 py-4 font-bold w-16">분류</th>
+              <th className="px-6 py-4 font-bold w-32">노출 위치</th>
               <th className="px-6 py-4 font-bold">제목</th>
               <th className="px-6 py-4 font-bold w-24">작성자</th>
               <th className="px-6 py-4 font-bold w-32">등록일</th>
@@ -134,6 +168,11 @@ export default function NoticesPage() {
                   ) : (
                     <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px] font-bold">일반</span>
                   )}
+                </td>
+                <td className="px-6 py-4">
+                  <span className="px-2 py-1 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 rounded text-[10px] font-bold">
+                    {getPageLabel(notice.target_page)}
+                  </span>
                 </td>
                 <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-200">{notice.title}</td>
                 <td className="px-6 py-4 font-medium text-gray-500">{notice.author}</td>
@@ -153,7 +192,6 @@ export default function NoticesPage() {
         {notices.length === 0 && <div className="p-10 text-center text-gray-400 font-bold">등록된 공지사항이 없습니다.</div>}
       </div>
 
-      {/* ⭐ 공지사항 작성 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[90vh]">
@@ -165,6 +203,20 @@ export default function NoticesPage() {
             </div>
             
             <div className="p-6 space-y-4 overflow-y-auto">
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">어디에 띄울까요?</label>
+                <select
+                  value={targetPage}
+                  onChange={(e) => setTargetPage(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm font-bold text-foreground focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
+                >
+                  {PAGE_OPTIONS.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">제목</label>
                 <input
@@ -182,7 +234,7 @@ export default function NoticesPage() {
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                   placeholder="공지 내용을 자세히 적어주세요. (줄바꿈이 그대로 적용됩니다)"
-                  className="w-full h-64 px-4 py-3 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all"
+                  className="w-full h-48 px-4 py-3 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all"
                 />
               </div>
 

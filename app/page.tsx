@@ -137,12 +137,12 @@ export default function HomePage() {
           })) as Community[]);
         }
 
-        // 5. 인기 커뮤니티 로드 (최근 24시간)
-        const oneDayAgo = new Date();
-        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+        // 5. ⭐ 인기 커뮤니티 로드 (최근 24시간 -> 7일로 변경)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const topCom = await supabase.from("community")
           .select("*, comments(count)")
-          .gte("created_at", oneDayAgo.toISOString())
+          .gte("created_at", sevenDaysAgo.toISOString())
           .order("likes", { ascending: false })
           .limit(5);
         if (topCom.data) {
@@ -164,6 +164,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+        
         
         {/* 섹션: 이번 주 인기 게임 */}
         <section className="mb-10">
@@ -298,10 +300,10 @@ export default function HomePage() {
           {/* 오른쪽 컬럼 (커뮤니티) */}
           <div className="lg:col-span-4 flex flex-col gap-6 w-full">
             
-            {/* 인기 게시글 */}
+            {/* ⭐ 인기 게시글 (최근 7일로 변경됨) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
-                <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">실시간 인기 커뮤니티 <Icons.ChevronRight /></button>
+                <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">주간 인기 커뮤니티 <Icons.ChevronRight /></button>
               </div>
               <ul className="divide-y divide-border">
                 {isMainLoading ? (
@@ -353,6 +355,7 @@ export default function HomePage() {
           <div className="flex gap-4">
             <span className="hover:text-foreground cursor-pointer">이용약관</span>
             <span className="hover:text-foreground cursor-pointer">개인정보처리방침</span>
+            <span onClick={() => router.push("/notices")} className="hover:text-foreground cursor-pointer">공지사항</span>
           </div>
         </div>
       </footer>

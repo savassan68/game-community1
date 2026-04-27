@@ -17,7 +17,12 @@ const Icons = {
   Mail: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   Logout: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
   UserIconLg: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
-  Bell: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+  // ⭐ 새 알림이 있을 때 흔들리는 효과 추가 (isRinging)
+  Bell: ({ isRinging }: { isRinging?: boolean }) => (
+    <svg className={`w-5 h-5 ${isRinging ? 'origin-top animate-bounce text-indigo-600 dark:text-indigo-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  ),
   Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
 };
 
@@ -29,9 +34,10 @@ const NAV_MENUS = [
   { path: "news", label: "뉴스" },
 ];
 
+// ⭐ 알림 타입에 "notice" 추가
 type Notification = {
   id: number;
-  type: "comment" | "reply" | "message";
+  type: "comment" | "reply" | "message" | "notice"; 
   actor_nickname: string;
   message: string;
   link: string;
@@ -164,8 +170,10 @@ export default function Header() {
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-3">
                 <div className="relative">
+                  
+                  {/* ⭐ 안 읽은 알림이 있을 때 종 흔들림 (isRinging) */}
                   <button onClick={() => { setIsNotiMenuOpen(!isNotiMenuOpen); setIsUserMenuOpen(false); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all relative ${isNotiMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
-                    <Icons.Bell />
+                    <Icons.Bell isRinging={unreadCount > 0} />
                     {unreadCount > 0 && <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-rose-500 border-2 border-white dark:border-slate-900"></span>}
                   </button>
 
@@ -182,7 +190,18 @@ export default function Header() {
                             {filteredNotifications.map((noti) => (
                               <li key={noti.id} onClick={() => handleNotiClick(noti)} className={`px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 flex gap-3 items-center ${noti.is_read ? 'opacity-50' : 'bg-indigo-50/20 dark:bg-indigo-900/10'}`}>
                                 <div className="flex-1 min-w-0 pr-1">
-                                  <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-snug"><span className="font-extrabold">{noti.actor_nickname}</span>님이 {noti.message}</p>
+                                  
+                                  {/* ⭐ 알림 타입이 notice일 때 전용 UI 출력 */}
+                                  {noti.type === 'notice' ? (
+                                    <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-snug">
+                                      <span className="font-extrabold text-indigo-600 dark:text-indigo-400">📢 공지사항</span> - {noti.message}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-snug">
+                                      <span className="font-extrabold">{noti.actor_nickname}</span>님이 {noti.message}
+                                    </p>
+                                  )}
+
                                   <p className="text-[10px] text-slate-400 mt-1 font-bold">{new Date(noti.created_at).toLocaleDateString()}</p>
                                 </div>
                                 <button onClick={(e) => handleDeleteNoti(e, noti.id)} className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors"><Icons.XMark /></button>

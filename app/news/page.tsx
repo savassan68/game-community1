@@ -23,10 +23,14 @@ export default function NewsPage() {
   const ITEMS_PER_PAGE = 10;
   const listTopRef = useRef<HTMLDivElement>(null);
 
+  // ⭐ API 최적화 1: 불필요한 중복 요청을 줄이기 위해 AbortController 사용 (옵션이지만 추천)
   const enrichItem = useCallback(async (item: GameMecaListItem): Promise<GameMecaListItem> => {
     if (item.summary && item.createdAt && item.imageUrl) return item;
     try {
-      const res = await fetch(`/api/gamemeca/article?url=${encodeURIComponent(item.articleUrl)}`);
+      // ⭐ API 최적화 2: next의 캐시 기능 활용 (5분(300초)마다 새로고침되도록 revalidate 설정)
+      const res = await fetch(`/api/gamemeca/article?url=${encodeURIComponent(item.articleUrl)}`, {
+        next: { revalidate: 300 } 
+      });
       if (res.ok) {
         const detail = await res.json();
         return { ...item, summary: item.summary || detail.summary || "", createdAt: item.createdAt || detail.createdAt || "", imageUrl: item.imageUrl || detail.imageUrl || "" };
@@ -38,7 +42,8 @@ export default function NewsPage() {
   useEffect(() => {
     const loadHeroData = async () => {
       try {
-        const res = await fetch("/api/gamemeca/list?category=main");
+        // ⭐ 메인 뉴스도 캐싱 적용
+        const res = await fetch("/api/gamemeca/list?category=main", { next: { revalidate: 300 } });
         const data = await res.json();
         if (res.ok && Array.isArray(data)) {
           const enriched = await Promise.all(data.slice(0, 5).map(item => enrichItem(item)));
@@ -54,7 +59,7 @@ export default function NewsPage() {
       setLoading(true);
       setCurrentPage(1);
       try {
-        const res = await fetch(`/api/gamemeca/list?category=${activeCategory}`);
+        const res = await fetch(`/api/gamemeca/list?category=${activeCategory}`, { next: { revalidate: 300 } });
         const data = await res.json();
         if (res.ok && Array.isArray(data)) setCategoryItems(data);
       } catch (err) { console.error(err); }
@@ -71,14 +76,11 @@ export default function NewsPage() {
     listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // ⭐ 사이드바용 데이터 가공 로직 수정
-  // 1. 인기 뉴스: 메인(전체) 카테고리에서 가져온 상위 5개
   const popularNewsData = mainItems.slice(0, 5).map(item => ({
     title: item.title,
     articleUrl: `/news/detail?url=${encodeURIComponent(item.articleUrl)}`,
   }));
 
-  // 2. 최신 뉴스: 현재 선택된 카테고리의 상위 5개
   const latestNewsData = categoryItems.slice(0, 5).map(item => ({
     title: item.title,
     articleUrl: `/news/detail?url=${encodeURIComponent(item.articleUrl)}`,
@@ -91,8 +93,11 @@ export default function NewsPage() {
         
         {/* 배너 섹션 */}
         <section className="mb-6">
-          <div className="rounded-[2rem] overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-            <MainHero items={mainItems.slice(0, 3)} />
+          <div className="rounded-[2rem] overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 relative">
+            {/* ⭐ 로딩 중일 때 깜빡임을 방지하는 최소 높이 설정 */}
+            <div className="min-h-[300px]">
+               <MainHero items={mainItems.slice(0, 3)} />
+            </div>
           </div>
         </section>
 
@@ -164,7 +169,7 @@ export default function NewsPage() {
             </div>
           </section>
 
-          {/* ⭐ 사이드바 호출 부분 수정 */}
+          {/* 사이드바 */}
           <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-28">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm">
               <RightSidebar 

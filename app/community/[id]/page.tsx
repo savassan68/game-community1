@@ -5,10 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import supabase from "../../../lib/supabaseClient"; 
 import CommentForm from "../../components/CommentForm";
 import CommentList from "../../components/CommentList";
-// ⭐ layout.tsx와 연결된 중앙 관리 토스트 훅 불러오기
 import { useToast } from "../../components/ToastProvider"; 
 
-// 아이콘 모음 (기존 동일)
 const Icons = {
   Heart: ({ filled }: { filled?: boolean }) => (
     <svg className={`w-5 h-5 transition-colors ${filled ? "text-primary fill-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
@@ -45,7 +43,6 @@ export default function DetailPage() {
   const { id } = useParams();
   const router = useRouter();
   
-  // ⭐ Context에서 함수 꺼내오기 (기존의 지저분했던 toastMsg, showToast 관련 State 전부 삭제됨!)
   const { triggerToast } = useToast();
 
   const [post, setPost] = useState<Post | null>(null);
@@ -53,6 +50,9 @@ export default function DetailPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserNickname, setCurrentUserNickname] = useState<string>("익명");
   const [loading, setLoading] = useState(true);
+
+  // 스크랩 상태 관리
+  const [isScrapped, setIsScrapped] = useState(false);
 
   // 통합 신고 상태 관리
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -84,6 +84,18 @@ export default function DetailPage() {
     if (!id) return;
     const { data, error } = await supabase.from("comments").select("*").eq("post_id", Number(id)).order("id", { ascending: true });
     if (!error && data) setComments(data as Comment[]);
+  };
+
+  // ⭐ DB의 'scraps' 테이블에서 스크랩 여부 확인
+  const fetchScrapStatus = async (postId: number, userId: string) => {
+    const { data } = await supabase
+      .from("scraps") 
+      .select("id")
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .maybeSingle();
+      
+    setIsScrapped(!!data);
   };
 
   const handleReportOpen = (type: 'post' | 'comment', targetId: number | string, author: string, content: string) => {
@@ -123,6 +135,25 @@ export default function DetailPage() {
     }
   };
 
+  // ⭐ 'scraps' 테이블에 추가/삭제 토글
+  const handleScrap = async () => {
+    if (!currentUserId) return triggerToast("로그인이 필요합니다.");
+
+    if (isScrapped) {
+      const { error } = await supabase.from("scraps").delete().eq("post_id", Number(id)).eq("user_id", currentUserId);
+      if (!error) {
+        setIsScrapped(false);
+        triggerToast("스크랩이 취소되었습니다.");
+      }
+    } else {
+      const { error } = await supabase.from("scraps").insert({ post_id: Number(id), user_id: currentUserId });
+      if (!error) {
+        setIsScrapped(true);
+        triggerToast("스크랩 되었습니다.");
+      }
+    }
+  };
+
   const deletePost = async () => {
     if (!confirm("정말 이 글을 삭제하시겠습니까?")) return;
     const { error } = await supabase.from("community").delete().eq("id", id);
@@ -141,6 +172,12 @@ export default function DetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (id && currentUserId) {
+      fetchScrapStatus(Number(id), currentUserId);
+    }
+  }, [id, currentUserId]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">로딩 중...</div>;
   if (!post) return <div className="p-20 text-center">글을 찾을 수 없습니다.</div>;
@@ -194,7 +231,14 @@ export default function DetailPage() {
             </button>
             <div className="flex items-center gap-6 mt-6">
                <button onClick={() => triggerToast("주소가 복사되었습니다.")} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"><Icons.Share /> 공유</button>
-               <button onClick={() => triggerToast("스크랩 되었습니다.")} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"><Icons.Bookmark /> 스크랩</button>
+               
+               <button 
+                 onClick={handleScrap} 
+                 className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${isScrapped ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+               >
+                 <Icons.Bookmark /> {isScrapped ? "스크랩 취소" : "스크랩"}
+               </button>
+               
                <button onClick={() => handleReportOpen('post', post.id, post.author, post.content)} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"><Icons.Alert /> 신고</button>
             </div>
           </div>
@@ -225,8 +269,6 @@ export default function DetailPage() {
           </div>
         </div>
       )}
-      
-      {/* ⭐ 삭제됨: 하단에 있던 fixed bottom-12 토스트 UI 코드 싹 지웠습니다! 이제 ToastProvider가 대신 띄워줍니다. */}
     </div>
   );
 }

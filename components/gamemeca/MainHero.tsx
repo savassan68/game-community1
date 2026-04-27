@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Image from "next/image"; // ⭐ Next.js Image 컴포넌트 추가
+import Link from "next/link";   // ⭐ Next.js Link 컴포넌트 추가
 import { GameMecaListItem } from "@/lib/gamemeca";
 
 type Props = {
@@ -9,13 +10,11 @@ type Props = {
 };
 
 export default function MainHero({ items = [] }: Props) {
-  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [giveUp, setGiveUp] = useState(false); // 5초 뒤 포기 알림
+  const [giveUp, setGiveUp] = useState(false);
 
   useEffect(() => {
-    // 5초간 데이터가 안 들어오면 무한 로딩 대신 메시지 전환
     const timer = setTimeout(() => {
       if (items.length === 0) setGiveUp(true);
     }, 5000);
@@ -30,7 +29,6 @@ export default function MainHero({ items = [] }: Props) {
     return () => clearInterval(interval);
   }, [items?.length, isPaused]);
 
-  // 로딩 및 빈 데이터 처리
   if (!items || items.length === 0) {
     return (
       <div className="flex h-[250px] sm:h-[320px] items-center justify-center rounded-3xl bg-slate-800/50 text-slate-400 font-bold animate-pulse">
@@ -55,8 +53,14 @@ export default function MainHero({ items = [] }: Props) {
           }`}
         >
           {item.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+            // ⭐ <img> 대신 <Image> 사용 (fill 속성으로 꽉 차게 만듦)
+            <Image 
+              src={item.imageUrl} 
+              alt={item.title} 
+              fill 
+              className="object-cover" 
+              priority={index === 0} // 첫 번째 이미지는 제일 먼저 불러오도록 우선순위 지정
+            />
           ) : (
             <div className="w-full h-full bg-slate-800" />
           )}
@@ -64,9 +68,10 @@ export default function MainHero({ items = [] }: Props) {
         </div>
       ))}
 
-      <div 
-        onClick={() => router.push(`/news/detail?url=${encodeURIComponent(currentItem.articleUrl)}`)}
-        className="absolute inset-0 p-6 sm:p-10 flex flex-col justify-end cursor-pointer z-20"
+      {/* ⭐ 껍데기 div의 onClick(router.push) 대신 <Link> 컴포넌트로 전체를 감쌈 */}
+      <Link 
+        href={`/news/detail?url=${encodeURIComponent(currentItem.articleUrl)}`}
+        className="absolute inset-0 p-6 sm:p-10 flex flex-col justify-end z-20"
       >
         <div className="flex items-center gap-3 mb-2">
           <span className="bg-primary px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-tighter">HOT ISSUE</span>
@@ -75,17 +80,18 @@ export default function MainHero({ items = [] }: Props) {
         <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight line-clamp-2 drop-shadow-lg group-hover:text-primary transition-colors duration-300">
           {currentItem.title}
         </h2>
-      </div>
+      </Link>
 
       {/* 하단 인디케이터 버튼 */}
       <div className="absolute bottom-6 right-8 z-30 flex gap-3">
         {items.map((_, index) => (
           <button
             key={index}
-            onClick={(e) => { e.stopPropagation(); setCurrentIndex(index); }}
+            onClick={(e) => { e.preventDefault(); setCurrentIndex(index); }} // Link 클릭이 안 되게 막기
             className={`h-3 transition-all duration-300 rounded-full border border-white/10 shadow-lg ${
               currentIndex === index ? "w-14 bg-primary border-primary" : "w-6 bg-white/30 hover:bg-white/60"
             }`}
+            aria-label={`Slide ${index + 1}`}
           />
         ))}
       </div>

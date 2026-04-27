@@ -188,7 +188,6 @@ export default function CommunityPage() {
 
             <div className="w-px h-4 bg-border mx-1 hidden sm:block"></div>
             
-            {/* ⭐ 인기글 모아보기 토글 버튼 (아이콘 제거 완료) */}
             <button
               onClick={() => { setShowOnlyPopular(!showOnlyPopular); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${
@@ -248,7 +247,6 @@ export default function CommunityPage() {
         <div className="flex items-center justify-between mb-4 px-1">
           <div className="text-sm text-muted-foreground font-medium flex items-center gap-2">
             전체 <span className="font-bold text-foreground">{totalCount.toLocaleString()}</span>개
-            {/* ⭐ 불 아이콘 제거됨 */}
             {showOnlyPopular && <span className="text-[10px] text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded font-bold">추천 {POPULAR_THRESHOLD}개 이상</span>}
           </div>
           <div className="flex gap-1 bg-secondary p-1 rounded-lg">
@@ -279,12 +277,14 @@ export default function CommunityPage() {
                   onClick={() => router.push(`/community/${post.id}`)}
                   className="group p-4 hover:bg-accent/40 transition-colors cursor-pointer flex items-center gap-4"
                 >
-                  <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors">
+                  {/* ⭐ 썸네일 박스는 무조건 유지하되, 이미지가 없으면 '...' 표시 */}
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors hidden sm:block">
                     {post.image_url ? (
                       <img src={post.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center opacity-40">
-                        <Icons.Image />
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50">
+                        {/* 디시인사이드 스타일의 텍스트 아이콘 (...) */}
+                        <span className="text-xl font-black tracking-widest text-muted-foreground/40 mt-[-4px]">...</span>
                       </div>
                     )}
                   </div>
