@@ -30,7 +30,8 @@ export default function LoginPage() {
     }
   };
 
-  // 🔹 네이버 로그인 핸들러
+  // 🔹 네이버 로그인 핸들러 (임시 주석 처리)
+  /*
   const handleNaverLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -44,6 +45,7 @@ export default function LoginPage() {
       alert("네이버 로그인 오류: " + error.message);
     }
   };
+  */
 
   // 🔹 일반 로그인 (아이디 or 이메일 처리)
   const handleLogin = async (e: React.FormEvent) => {
@@ -201,7 +203,8 @@ export default function LoginPage() {
             Google로 계속하기
           </button>
 
-          {/* 네이버 버튼 */}
+          {/* 네이버 버튼 (임시 주석 처리) */}
+          {/*
           <button
             onClick={handleNaverLogin}
             className="mt-3 w-full py-3.5 rounded-xl bg-[#03C75A] text-white font-bold text-sm shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -217,6 +220,7 @@ export default function LoginPage() {
             </svg>
             Naver로 계속하기
           </button>
+          */}
         </div>
 
         <div className="mt-8 text-center text-sm">
