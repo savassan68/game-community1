@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
 import { GAME_CATEGORIES } from "@/lib/constants";
@@ -64,7 +64,8 @@ const getScoreBadgeStyle = (score: number) => {
   return "bg-rose-500 text-white";
 };
 
-export default function ReviewPage() {
+// 1. 기존의 ReviewPage를 ReviewContent라는 이름으로 변경합니다.
+function ReviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -405,5 +406,20 @@ export default function ReviewPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 2. 외부로 내보내는 진짜 페이지 컴포넌트를 만들고, Suspense로 감싸줍니다!
+export default function ReviewPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <ReviewContent />
+    </Suspense>
   );
 }
