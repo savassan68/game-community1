@@ -137,7 +137,7 @@ export default function HomePage() {
           })) as Community[]);
         }
 
-        // 5. ⭐ 인기 커뮤니티 로드 (최근 24시간 -> 7일로 변경)
+        // 5. 인기 커뮤니티 로드 (최근 7일)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const topCom = await supabase.from("community")
@@ -165,9 +165,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
-        
-        
-        {/* 섹션: 이번 주 인기 게임 */}
+        {/* 섹션: 이번 주 인기 게임 (기존 스켈레톤 유지) */}
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-4 px-1">
             <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -218,7 +216,7 @@ export default function HomePage() {
           {/* 왼쪽 컬럼 (뉴스, 평론) */}
           <div className="lg:col-span-8 flex flex-col gap-6 w-full">
             
-            {/* 최신 게임 뉴스 */}
+            {/* 최신 게임 뉴스 (스켈레톤 적용) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-1 lg:order-2">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/news")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최신 게임 뉴스 <Icons.ChevronRight /></button>
@@ -236,7 +234,16 @@ export default function HomePage() {
               </div>
               <div className="grid grid-cols-1 gap-4">
                 {newsLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground"><Icons.Loader className="mb-3 w-8 h-8" /></div>
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex gap-4 p-3 border border-transparent">
+                      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg bg-muted animate-pulse" />
+                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                        <div className="w-16 h-4 bg-muted animate-pulse rounded" />
+                        <div className="w-3/4 h-5 bg-muted animate-pulse rounded" />
+                        <div className="w-full h-8 bg-muted animate-pulse rounded mt-1" />
+                      </div>
+                    </div>
+                  ))
                 ) : news.length > 0 ? (
                   news.slice(0, 4).map((n) => (
                     <div key={n.id} onClick={() => router.push(`/news/detail?url=${encodeURIComponent(n.articleUrl)}`)} className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border">
@@ -257,14 +264,23 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 인기 유저 평론 */}
+            {/* 인기 유저 평론 (스켈레톤 적용) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-2 lg:order-1">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">이번 주 인기 평론 <Icons.ChevronRight /></button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {isMainLoading ? (
-                  <div className="col-span-2 py-8 flex justify-center"><Icons.Loader /></div>
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="bg-muted/30 rounded-xl border border-border p-5 h-[120px] flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <div className="w-20 h-5 bg-muted animate-pulse rounded" />
+                        <div className="w-10 h-4 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="w-3/4 h-5 bg-muted animate-pulse rounded" />
+                      <div className="w-full h-4 bg-muted animate-pulse rounded" />
+                    </div>
+                  ))
                 ) : topReviews.length > 0 ? topReviews.map((r) => (
                   <div key={r.id} onClick={() => router.push(`/review/${r.game_id}`)} className="bg-muted/50 rounded-xl border border-border p-5 hover:border-primary hover:bg-card hover:shadow-md transition-all cursor-pointer group">
                     <div className="flex items-center justify-between mb-3">
@@ -278,14 +294,20 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 최신 유저 평론 */}
+            {/* 최신 유저 평론 (스켈레톤 적용) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-3">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최신 유저 평론 <Icons.ChevronRight /></button>
               </div>
               <ul className="divide-y divide-border">
                 {isMainLoading ? (
-                  <div className="py-8 flex justify-center"><Icons.Loader /></div>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <li key={i} className="py-4 px-3 flex flex-col gap-2">
+                      <div className="w-16 h-3 bg-muted animate-pulse rounded" />
+                      <div className="w-1/2 h-5 bg-muted animate-pulse rounded" />
+                      <div className="w-full h-4 bg-muted animate-pulse rounded" />
+                    </li>
+                  ))
                 ) : latestReviews.length > 0 ? latestReviews.map((r) => (
                   <li key={r.id} onClick={() => router.push(`/review/${r.game_id}`)} className="py-4 hover:bg-accent transition-colors cursor-pointer group flex flex-col gap-1.5 px-3 rounded-xl">
                     <span className="text-[10px] font-bold text-primary">{r.games?.title}</span>
@@ -300,14 +322,22 @@ export default function HomePage() {
           {/* 오른쪽 컬럼 (커뮤니티) */}
           <div className="lg:col-span-4 flex flex-col gap-6 w-full">
             
-            {/* ⭐ 인기 게시글 (최근 7일로 변경됨) */}
+            {/* 인기 게시글 (스켈레톤 적용) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">주간 인기 커뮤니티 <Icons.ChevronRight /></button>
               </div>
               <ul className="divide-y divide-border">
                 {isMainLoading ? (
-                   <div className="py-8 flex justify-center"><Icons.Loader /></div>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <li key={i} className="py-3.5 flex items-center justify-between gap-3 px-1">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-6 h-6 rounded-lg bg-muted animate-pulse flex-shrink-0" />
+                        <div className="w-2/3 h-5 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="w-12 h-4 bg-muted animate-pulse rounded flex-shrink-0" />
+                    </li>
+                  ))
                 ) : topCommunity.length > 0 ? topCommunity.map((p, idx) => (
                   <li key={p.id} onClick={() => router.push(`/community/${p.id}`)} className="py-3.5 flex items-center justify-between gap-3 cursor-pointer group px-1">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -323,14 +353,19 @@ export default function HomePage() {
               </ul>
             </section>
 
-            {/* 최근 커뮤니티 글 */}
+            {/* 최근 커뮤니티 글 (스켈레톤 적용) */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최근 커뮤니티 글 <Icons.ChevronRight /></button>
               </div>
               <ul className="divide-y divide-border">
                 {isMainLoading ? (
-                   <div className="py-8 flex justify-center"><Icons.Loader /></div>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <li key={i} className="py-3.5 flex items-center justify-between px-2 gap-4">
+                      <div className="w-3/4 h-5 bg-muted animate-pulse rounded" />
+                      <div className="w-16 h-4 bg-muted animate-pulse rounded flex-shrink-0" />
+                    </li>
+                  ))
                 ) : latestCommunity.length > 0 ? latestCommunity.map((p) => (
                   <li key={p.id} onClick={() => router.push(`/community/${p.id}`)} className="py-3.5 flex items-center justify-between cursor-pointer group px-2 hover:bg-accent transition-colors rounded-lg">
                     <div className="flex-1 min-w-0 pr-2">

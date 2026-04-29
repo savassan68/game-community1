@@ -240,9 +240,10 @@ export default function Header() {
                 </div>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <button onClick={() => router.push("/auth/login")} className="text-sm font-semibold text-slate-600 dark:text-slate-300 px-2 sm:px-3 py-2 hover:text-indigo-600 transition-colors">로그인</button>
-                <button onClick={() => router.push("/auth/signup")} className="text-sm font-semibold text-white bg-indigo-600 px-3 sm:px-4 py-2 rounded-full hover:bg-indigo-700 shadow-md">회원가입</button>
+              // ⭐ hidden sm:flex 를 추가해서 모바일에서는 숨기고, whitespace-nowrap으로 줄바꿈을 막습니다.
+              <div className="hidden sm:flex gap-2">
+                <button onClick={() => router.push("/auth/login")} className="whitespace-nowrap text-sm font-semibold text-slate-600 dark:text-slate-300 px-3 py-2 hover:text-indigo-600 transition-colors">로그인</button>
+                <button onClick={() => router.push("/auth/signup")} className="whitespace-nowrap text-sm font-semibold text-white bg-indigo-600 px-4 py-2 rounded-full hover:bg-indigo-700 shadow-md">회원가입</button>
               </div>
             )}
           </div>
