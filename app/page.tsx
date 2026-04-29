@@ -196,7 +196,7 @@ export default function HomePage() {
                         src={game.image_url} 
                         alt={game.title} 
                         fill
-                        unoptimized
+                        priority
                         className="object-cover group-hover:scale-105 transition-transform duration-700" 
                       />
                     ) : (
