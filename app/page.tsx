@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
+// ⭐ 1. Next.js 이미지 최적화 및 프록시 우회 컴포넌트 불러오기
+import Image from "next/image"; 
 
 /** ⭐ 아이콘 및 로더 컴포넌트 */
 const Icons = {
@@ -189,17 +191,24 @@ export default function HomePage() {
                     className="flex-shrink-0 w-[75vw] sm:w-auto snap-center group relative h-44 sm:h-48 lg:h-52 rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border bg-card"
                   >
                     {game.image_url ? (
-                      <img src={game.image_url} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      // ⭐ 2. <img> 대신 <Image> 컴포넌트 사용 (모바일 차단 완벽 우회)
+                      <Image 
+                        src={game.image_url} 
+                        alt={game.title} 
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                      />
                     ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground"><Icons.Image /></div>
+                      <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground relative z-10"><Icons.Image /></div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity z-10" />
                     {score > 0 && (
-                      <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-black shadow-lg backdrop-blur-md bg-opacity-90 border transition-transform group-hover:scale-105 ${score >= 80 ? 'bg-emerald-500/90 text-white border-emerald-400' : score >= 50 ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-rose-500/90 text-white border-rose-400'}`}>
+                      <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-black shadow-lg backdrop-blur-md bg-opacity-90 border transition-transform group-hover:scale-105 z-20 ${score >= 80 ? 'bg-emerald-500/90 text-white border-emerald-400' : score >= 50 ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-rose-500/90 text-white border-rose-400'}`}>
                         {score}
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 p-4 w-full">
+                    <div className="absolute bottom-0 left-0 p-4 w-full z-20">
                       <h3 className="text-white font-extrabold text-base sm:text-lg line-clamp-2 drop-shadow-md">{game.title}</h3>
                     </div>
                   </div>
@@ -216,7 +225,7 @@ export default function HomePage() {
           {/* 왼쪽 컬럼 (뉴스, 평론) */}
           <div className="lg:col-span-8 flex flex-col gap-6 w-full">
             
-            {/* 최신 게임 뉴스 (스켈레톤 적용) */}
+            {/* 최신 게임 뉴스 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-1 lg:order-2">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/news")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최신 게임 뉴스 <Icons.ChevronRight /></button>
@@ -247,8 +256,19 @@ export default function HomePage() {
                 ) : news.length > 0 ? (
                   news.slice(0, 4).map((n) => (
                     <div key={n.id} onClick={() => router.push(`/news/detail?url=${encodeURIComponent(n.articleUrl)}`)} className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border">
-                      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border">
-                        {n.imageUrl ? <img src={n.imageUrl} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <div className="w-full h-full flex items-center justify-center"><Icons.Image /></div>}
+                      {/* ⭐ 3. 뉴스 썸네일도 <Image>로 교체 (relative 추가) */}
+                      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border relative">
+                        {n.imageUrl ? (
+                          <Image 
+                            src={n.imageUrl} 
+                            alt={n.title} 
+                            fill
+                            unoptimized
+                            className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center relative z-10"><Icons.Image /></div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -264,7 +284,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 인기 유저 평론 (스켈레톤 적용) */}
+            {/* 인기 유저 평론 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-2 lg:order-1">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">이번 주 인기 평론 <Icons.ChevronRight /></button>
@@ -294,7 +314,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 최신 유저 평론 (스켈레톤 적용) */}
+            {/* 최신 유저 평론 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm order-3">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/review")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최신 유저 평론 <Icons.ChevronRight /></button>
@@ -322,7 +342,7 @@ export default function HomePage() {
           {/* 오른쪽 컬럼 (커뮤니티) */}
           <div className="lg:col-span-4 flex flex-col gap-6 w-full">
             
-            {/* 인기 게시글 (스켈레톤 적용) */}
+            {/* 인기 게시글 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">주간 인기 커뮤니티 <Icons.ChevronRight /></button>
@@ -353,7 +373,7 @@ export default function HomePage() {
               </ul>
             </section>
 
-            {/* 최근 커뮤니티 글 (스켈레톤 적용) */}
+            {/* 최근 커뮤니티 글 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최근 커뮤니티 글 <Icons.ChevronRight /></button>
