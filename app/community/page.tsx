@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import supabase from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
-/** ⭐ 아이콘 객체 (기존 유지) */
+/** ⭐ 아이콘 객체 */
 const Icons = {
   Fire: () => <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.45-.412-1.725a1 1 0 00-1.734-.636 4.965 4.965 0 00-.73 2.193 4.996 4.996 0 005.152 5.567 5.002 5.002 0 004.97-5.32 8.783 8.783 0 00-.916-4.522 9.426 9.426 0 00-1.127-1.928c-.167-.23-.335-.43-.497-.587zM8 12a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" /></svg>,
   Message: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
@@ -17,11 +17,13 @@ const Icons = {
   Image: () => <svg className="w-6 h-6 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
 };
 
+// ⭐ 1. 타입 정의
 interface Post {
   id: number;
   title: string;
   content?: string;
   author: string;
+  user_profiles?: { nickname: string }; 
   created_at: string;
   views: number;
   likes: number;
@@ -62,7 +64,6 @@ const getCategoryLabel = (category: string) => {
   return found ? found.label : category;
 };
 
-// ⭐ 추천 수 5개 이상을 인기글로 분류
 const POPULAR_THRESHOLD = 5; 
 
 export default function CommunityPage() {
@@ -79,8 +80,6 @@ export default function CommunityPage() {
   const [searchType, setSearchType] = useState("title_content");
   const [keyword, setKeyword] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
-  
-  // ⭐ 인기글만 보기 토글 상태
   const [showOnlyPopular, setShowOnlyPopular] = useState(false);
   
   // 페이징 상태
@@ -92,13 +91,12 @@ export default function CommunityPage() {
     try {
       let query = supabase
         .from("community")
-        .select("*", { count: "exact" });
+        .select("*, user_profiles(nickname)", { count: "exact" });
 
       if (activeCategory !== "all") {
         query = query.eq("category", activeCategory);
       }
 
-      // ⭐ 인기글 필터링
       if (showOnlyPopular) {
         query = query.gte("likes", POPULAR_THRESHOLD);
       }
@@ -112,7 +110,7 @@ export default function CommunityPage() {
         } else if (searchType === "content") {
           query = query.ilike("content", term);
         } else if (searchType === "nickname") {
-          query = query.ilike("author", term);
+          query = query.ilike("user_profiles.nickname", term);
         }
       }
 
@@ -129,26 +127,26 @@ export default function CommunityPage() {
       
       setPosts(data as Post[]);
       setTotalCount(count || 0);
-    } catch (err) {
-      console.error("게시글 로딩 실패:", err);
+    } catch (err: any) {
+      console.error("🚨 게시글 로딩 에러:", err.message, err.hint, err.details);
     } finally {
       setLoading(false);
     }
   }, [activeCategory, sort, appliedKeyword, searchType, currentPage, showOnlyPopular]);
 
-  const fetchPopularPosts = async () => {
+  const fetchPopularPosts = useCallback(async () => {
     const oneDayAgo = new Date();
     oneDayAgo.setHours(oneDayAgo.getHours() - 24);
     
     const { data } = await supabase
       .from("community")
-      .select("*")
+      .select("*, user_profiles(nickname)")
       .gte("created_at", oneDayAgo.toISOString())
       .order("likes", { ascending: false })
       .limit(6);
     
     if (data) setPopularPosts(data as Post[]);
-  };
+  }, []);
 
   useEffect(() => {
     fetchPosts();
@@ -156,7 +154,24 @@ export default function CommunityPage() {
 
   useEffect(() => {
     fetchPopularPosts();
-  }, []);
+  }, [fetchPopularPosts]);
+
+  // ⭐ 2. 강력한 '화면 새로고침' 리스너 추가 
+  // 뒤로가기를 하거나 탭으로 다시 돌아오면 DB에서 잽싸게 최신 조회수를 긁어옵니다.
+  useEffect(() => {
+    const handleReturnToPage = () => {
+      fetchPosts();
+      fetchPopularPosts();
+    };
+
+    window.addEventListener("focus", handleReturnToPage);
+    window.addEventListener("pageshow", handleReturnToPage);
+
+    return () => {
+      window.removeEventListener("focus", handleReturnToPage);
+      window.removeEventListener("pageshow", handleReturnToPage);
+    };
+  }, [fetchPosts, fetchPopularPosts]);
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -277,13 +292,11 @@ export default function CommunityPage() {
                   onClick={() => router.push(`/community/${post.id}`)}
                   className="group p-4 hover:bg-accent/40 transition-colors cursor-pointer flex items-center gap-4"
                 >
-                  {/* ⭐ 썸네일 박스는 무조건 유지하되, 이미지가 없으면 '...' 표시 */}
                   <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors hidden sm:block">
                     {post.image_url ? (
                       <img src={post.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50">
-                        {/* 디시인사이드 스타일의 텍스트 아이콘 (...) */}
                         <span className="text-xl font-black tracking-widest text-muted-foreground/40 mt-[-4px]">...</span>
                       </div>
                     )}
@@ -294,7 +307,9 @@ export default function CommunityPage() {
                       <span className={`text-[10px] font-black tracking-wider px-1.5 py-0.5 rounded border ${getCategoryBadgeStyle(post.category)}`}>
                         {getCategoryLabel(post.category)}
                       </span>
-                      <span className="text-[11px] text-muted-foreground font-medium">{post.author} · {timeAgo(post.created_at)}</span>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {post.user_profiles?.nickname || post.author || "익명"} · {timeAgo(post.created_at)}
+                      </span>
                     </div>
                     
                     <div className="flex items-center gap-1.5">

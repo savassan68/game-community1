@@ -20,7 +20,18 @@ const Icons = {
   Alert: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
 };
 
-interface Post { id: number; title: string; content: string; author: string; user_id?: string; views: number; likes: number; created_at?: string; category?: string; }
+interface Post { 
+  id: number; 
+  title: string; 
+  content: string; 
+  author: string; 
+  user_profiles?: { nickname: string }; 
+  user_id?: string; 
+  views: number; 
+  likes: number; 
+  created_at?: string; 
+  category?: string; 
+}
 interface Comment { id: number; post_id: number; user_id: string; nickname: string; content: string; created_at: string; }
 
 function timeAgo(dateString?: string) {
@@ -51,10 +62,8 @@ export default function DetailPage() {
   const [currentUserNickname, setCurrentUserNickname] = useState<string>("익명");
   const [loading, setLoading] = useState(true);
 
-  // 스크랩 상태 관리
   const [isScrapped, setIsScrapped] = useState(false);
 
-  // 통합 신고 상태 관리
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportTarget, setReportTarget] = useState<{ type: 'post' | 'comment'; id: number | string; author: string; content: string; } | null>(null);
@@ -75,7 +84,11 @@ export default function DetailPage() {
 
   const fetchPost = async () => {
     if (!id) return;
-    const { data, error } = await supabase.from("community").select("*").eq("id", Number(id)).single();
+    const { data, error } = await supabase
+      .from("community")
+      .select("*, user_profiles(nickname)")
+      .eq("id", Number(id))
+      .single();
     if (!error && data) setPost(data as Post);
     setLoading(false);
   };
@@ -86,7 +99,6 @@ export default function DetailPage() {
     if (!error && data) setComments(data as Comment[]);
   };
 
-  // ⭐ DB의 'scraps' 테이블에서 스크랩 여부 확인
   const fetchScrapStatus = async (postId: number, userId: string) => {
     const { data } = await supabase
       .from("scraps") 
@@ -135,7 +147,6 @@ export default function DetailPage() {
     }
   };
 
-  // ⭐ 'scraps' 테이블에 추가/삭제 토글
   const handleScrap = async () => {
     if (!currentUserId) return triggerToast("로그인이 필요합니다.");
 
@@ -163,13 +174,22 @@ export default function DetailPage() {
     }
   };
 
+  // ⭐⭐ 핵심 수정 부분: 조회수를 확실히 올리고 나서 데이터를 가져오게 합니다.
   useEffect(() => {
-    if (id && !viewUpdated.current) {
-      viewUpdated.current = true;
-      supabase.rpc("increase_views", { post_id: Number(id) });
-      fetchPost();
-      fetchComments();
-    }
+    const initData = async () => {
+      if (id && !viewUpdated.current) {
+        viewUpdated.current = true;
+        
+        // 1. 파라미터 이름을 p_post_id로 변경하고 조회수가 오를 때까지 기다립니다(await)
+        const { error } = await supabase.rpc("increase_views", { p_post_id: Number(id) });
+        if (error) console.error("조회수 증가 에러:", error);
+
+        // 2. 조회가 다 올랐으면 최신 데이터를 가져옵니다.
+        await fetchPost();
+        await fetchComments();
+      }
+    };
+    initData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -183,6 +203,8 @@ export default function DetailPage() {
   if (!post) return <div className="p-20 text-center">글을 찾을 수 없습니다.</div>;
 
   const isAuthor = currentUserId && post.user_id === currentUserId;
+  
+  const displayAuthorName = post.user_profiles?.nickname || post.author || "익명";
 
   return (
     <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6">
@@ -207,10 +229,10 @@ export default function DetailPage() {
             <h1 className="text-2xl sm:text-3xl font-black mb-6 leading-tight">{post.title}</h1>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold cursor-pointer" onClick={() => post.user_id && router.push(`/user/${post.user_id}`)}>
-                {post.author[0].toUpperCase()}
+                {displayAuthorName[0].toUpperCase()}
               </div>
               <div>
-                <div className="text-sm font-bold">{post.author}</div>
+                <div className="text-sm font-bold">{displayAuthorName}</div>
                 <div className="text-xs text-muted-foreground flex gap-2 mt-0.5">
                   <span>{timeAgo(post.created_at)}</span>
                   <span>•</span>
@@ -239,7 +261,7 @@ export default function DetailPage() {
                  <Icons.Bookmark /> {isScrapped ? "스크랩 취소" : "스크랩"}
                </button>
                
-               <button onClick={() => handleReportOpen('post', post.id, post.author, post.content)} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"><Icons.Alert /> 신고</button>
+               <button onClick={() => handleReportOpen('post', post.id, displayAuthorName, post.content)} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"><Icons.Alert /> 신고</button>
             </div>
           </div>
         </article>
@@ -253,7 +275,6 @@ export default function DetailPage() {
         </div>
       </div>
 
-      {/* 통합 신고 모달 */}
       {isReportModalOpen && reportTarget && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden">
