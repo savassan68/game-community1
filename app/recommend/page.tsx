@@ -26,16 +26,15 @@ export default function RecommendPage() {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [userInput, setUserInput] = useState("");
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [previousTitles, setPreviousTitles] = useState<string[]>([]); // 추천 중복 방지용
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [conflictError, setConflictError] = useState("");
 
-  // 상충 조건 실시간 검사 (단판+하드코어, 힐링+하드코어)
   useEffect(() => {
     if (mode === "logic") {
       const { playTime, energy, emotion } = selections;
       let error = "";
-
       if (playTime?.includes("단판/단기") && energy === "하드코어") {
         error = "⚠️ 짧은 '단판/단기' 플레이와 '하드코어' 난이도는 현실적으로 상충하는 조건입니다.";
       } else if (emotion === "힐링" && energy === "하드코어") {
@@ -47,12 +46,31 @@ export default function RecommendPage() {
 
   const handleGetRecommendation = async (retry = false) => {
     if (conflictError) return;
-    if (retry) setIsRefreshing(true);
-    else { setIsLoading(true); setRecommendations([]); }
+
+    let currentExcludeList = previousTitles;
+
+    if (retry) {
+      setIsRefreshing(true);
+      // 현재 보고 있는 게임들의 제목을 제외 목록에 추가
+      const newTitles = recommendations.map(r => r.title);
+      currentExcludeList = Array.from(new Set([...previousTitles, ...newTitles]));
+      setPreviousTitles(currentExcludeList);
+    } else {
+      setIsLoading(true);
+      setRecommendations([]);
+      setPreviousTitles([]); // 새로운 검색 시 초기화
+      currentExcludeList = [];
+    }
     
     try {
       const { data, error } = await supabase.functions.invoke("GameRecommend", {
-        body: { mode, selections, userInput, isRetry: retry },
+        body: { 
+          mode, 
+          selections, 
+          userInput, 
+          isRetry: retry,
+          excludeTitles: currentExcludeList // 서버로 제외 목록 전달
+        },
       });
       if (error) throw error;
       setRecommendations(data.recommendations);
@@ -69,7 +87,6 @@ export default function RecommendPage() {
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans tracking-tight">
       <main className="max-w-5xl mx-auto px-4 py-16">
-        
         <div className="text-center mb-16 space-y-4">
           <h1 className={FONT_STYLE.h1}>Discovery Engine</h1>
           <p className="text-muted-foreground font-bold">당신의 취향을 분석하여 최적의 게임 5개를 제안합니다.</p>
@@ -102,7 +119,6 @@ export default function RecommendPage() {
                   </div>
                 </div>
               ))}
-              
               {conflictError && (
                 <div className="mt-8 p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] animate-in fade-in slide-in-from-top-2">
                   <p className="text-red-500 text-sm font-black text-center break-keep leading-relaxed">{conflictError}</p>
@@ -110,7 +126,7 @@ export default function RecommendPage() {
               )}
             </div>
           ) : (
-            <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="원하는 게임의 분위기나 특징을 자유롭게 묘사해주세요." className="w-full h-56 p-10 bg-muted/50 border-none rounded-[2.5rem] focus:ring-2 ring-primary transition-all text-lg font-bold leading-relaxed resize-none font-medium placeholder:text-muted-foreground/40" />
+            <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="원하는 게임의 분위기나 특징을 자유롭게 묘사해주세요." className="w-full h-56 p-10 bg-muted/50 border-none rounded-[2.5rem] focus:ring-2 ring-primary transition-all text-lg font-bold leading-relaxed resize-none placeholder:text-muted-foreground/40" />
           )}
 
           <button 

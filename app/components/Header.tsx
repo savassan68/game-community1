@@ -29,7 +29,7 @@ const Icons = {
 const NAV_MENUS = [
   { path: "community", label: "커뮤니티" },
   { path: "review", label: "평론" },
-  { path: "user-review", label: "유저 리뷰" },
+  // { path: "user-review", label: "유저 리뷰" }, // ⭐ 베타 테스트 기간 동안 임시 숨김 처리
   { path: "recommend", label: "AI 추천" },
   { path: "news", label: "뉴스" },
 ];
