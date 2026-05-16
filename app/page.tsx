@@ -410,6 +410,7 @@ export default function HomePage() {
           <div className="flex gap-4">
             <span className="hover:text-foreground cursor-pointer">이용약관</span>
             <span className="hover:text-foreground cursor-pointer">개인정보처리방침</span>
+            <span onClick={() => router.push("/inquiry")} className="hover:text-foreground cursor-pointer transition-colors">문의사항</span>
             <span onClick={() => router.push("/notices")} className="hover:text-foreground cursor-pointer">공지사항</span>
           </div>
         </div>

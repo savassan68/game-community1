@@ -32,6 +32,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
     </svg>
   ),
+  Clock: () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
 };
 
 type Game = {
@@ -58,13 +63,6 @@ const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
   { id: "rating", label: "평점순" },
 ];
 
-const getScoreBadgeStyle = (score: number) => {
-  if (score >= 80) return "bg-emerald-500 text-white";
-  if (score >= 50) return "bg-amber-500 text-white";
-  return "bg-rose-500 text-white";
-};
-
-// 1. 기존의 ReviewPage를 ReviewContent라는 이름으로 변경합니다.
 function ReviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,10 +77,39 @@ function ReviewContent() {
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [searchQuery, setSearchQuery] = useState(initialSearch);
 
+  const [user, setUser] = useState<any>(null);
+  const [myPlaytimes, setMyPlaytimes] = useState<Record<string, number>>({});
+
   useEffect(() => {
-    const load = async () => {
+    const fetchUserContext = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const { data: ownedGames } = await supabase
+          .from("user_owned_games")
+          .select("game_title, playtime_forever")
+          .eq("user_id", session.user.id);
+        
+        if (ownedGames && ownedGames.length > 0) {
+          const playtimeMap: Record<string, number> = {};
+          ownedGames.forEach((g: any) => {
+            playtimeMap[g.game_title] = g.playtime_forever;
+          });
+          setMyPlaytimes(playtimeMap);
+        }
+      }
+    };
+    fetchUserContext();
+  }, []);
+
+  useEffect(() => {
+    const loadGames = async () => {
       setLoading(true);
-      let query = supabase.from("games").select("*").order("created_at", { ascending: false });
+      
+      let query = supabase.from("games")
+        .select("*")
+        .order("metacritic_score", { ascending: false, nullsFirst: false });
 
       if (selectedCategory !== "all") {
         query = query.contains("categories", [selectedCategory]);
@@ -99,7 +126,7 @@ function ReviewContent() {
 
       setLoading(false);
     };
-    load();
+    loadGames();
   }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
@@ -109,18 +136,46 @@ function ReviewContent() {
   const handleSearch = () => setSearchQuery(searchInput.trim());
 
   const getDisplayScore = (g: Game) => Math.max(g.opencritic_score || 0, g.metacritic_score || 0);
-
-  const getAverageRating = (g: Game) =>
-    typeof g.average_rating === "number" ? g.average_rating : getDisplayScore(g);
+  const getSiteRating = (g: Game) => typeof g.average_rating === "number" ? g.average_rating : 0;
 
   const filteredGames = useMemo(() => {
     let result = [...games];
-    if (selectedFilter === "score90") result = result.filter((g) => getDisplayScore(g) >= 90);
-    else if (selectedFilter === "score70") result = result.filter((g) => getDisplayScore(g) >= 70);
-    else if (selectedFilter === "recommend") result.sort((a, b) => (b.recommend_count ?? 0) - (a.recommend_count ?? 0));
-    else if (selectedFilter === "rating") result.sort((a, b) => getAverageRating(b) - getAverageRating(a));
+
+    if (selectedFilter === "score90") {
+      result = result.filter((g) => getDisplayScore(g) >= 90);
+    } else if (selectedFilter === "score70") {
+      result = result.filter((g) => getDisplayScore(g) >= 70);
+    } else if (selectedFilter === "recommend") {
+      result.sort((a, b) => (b.recommend_count ?? 0) - (a.recommend_count ?? 0));
+    } else if (selectedFilter === "rating") {
+      result.sort((a, b) => getSiteRating(b) - getSiteRating(a));
+    } else if (selectedFilter === "all") {
+      
+      if (user && Object.keys(myPlaytimes).length > 0) {
+        result.sort((a, b) => {
+          const timeA = myPlaytimes[a.title] || 0;
+          const timeB = myPlaytimes[b.title] || 0;
+          
+          if (timeA === 0 && timeB === 0) {
+            return getDisplayScore(b) - getDisplayScore(a);
+          }
+          return timeB - timeA; 
+        });
+      } else {
+        result.sort((a, b) => {
+          const scoreA = getDisplayScore(a);
+          const scoreB = getDisplayScore(b);
+          
+          if (scoreA !== scoreB) {
+            return scoreB - scoreA; 
+          }
+          return (b.recommend_count ?? 0) - (a.recommend_count ?? 0);
+        });
+      }
+    }
+    
     return result;
-  }, [games, selectedFilter]);
+  }, [games, selectedFilter, user, myPlaytimes]);
 
   const totalPages = Math.max(1, Math.ceil(filteredGames.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -147,7 +202,7 @@ function ReviewContent() {
     <div className="min-h-screen bg-background text-foreground pb-20 transition-colors duration-300">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-8 py-10">
         
-        {/* ⭐ 검색바 (인디고 링 & 버튼) */}
+        {/* 검색바 */}
         <div className="bg-card border border-border shadow-sm rounded-2xl p-1.5 mb-6 sm:mb-12 max-w-xl mx-auto flex items-center focus-within:ring-4 focus-within:ring-indigo-500/20 focus-within:border-indigo-400 transition-all">
           <div className="pl-4 text-muted-foreground">
             <Icons.Search />
@@ -254,10 +309,17 @@ function ReviewContent() {
           {/* 본문 */}
           <main className="lg:col-span-8">
             <div className="mb-6 flex items-baseline justify-between px-2">
-              <h2 className="text-xl font-black text-foreground tracking-tight">
-                {selectedCategory === "all" ? "전체 게임" : GAME_CATEGORIES.find((c) => c.slug === selectedCategory)?.name}
-                <span className="ml-2 text-xs font-bold text-muted-foreground italic">({filteredGames.length})</span>
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-black text-foreground tracking-tight">
+                  {selectedCategory === "all" ? "전체 게임" : GAME_CATEGORIES.find((c) => c.slug === selectedCategory)?.name}
+                  <span className="ml-2 text-xs font-bold text-muted-foreground italic">({filteredGames.length})</span>
+                </h2>
+                {user && Object.keys(myPlaytimes).length > 0 && selectedFilter === "all" && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-md border border-indigo-500/20 animate-fade-in">
+                    <Icons.Clock /> 내 플레이 타임순
+                  </span>
+                )}
+              </div>
               <span className="text-xs font-bold text-muted-foreground">페이지 {safeCurrentPage} / {totalPages}</span>
             </div>
 
@@ -270,6 +332,9 @@ function ReviewContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                   {paginatedGames.map((g) => {
                     const displayScore = getDisplayScore(g);
+                    const siteRating = getSiteRating(g);
+                    const myPlaytime = myPlaytimes[g.title] || 0;
+
                     return (
                       <div
                         key={g.id}
@@ -282,29 +347,53 @@ function ReviewContent() {
                           ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-black">NO IMAGE</div>
                           )}
-                          {displayScore > 0 && (
-                            <div className={cn("absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg text-[11px] font-black shadow-lg backdrop-blur-md", getScoreBadgeStyle(displayScore))}>
-                              {displayScore}
-                            </div>
-                          )}
                         </div>
 
                         <div className="p-4 flex flex-col flex-1">
-                          <h3 className="font-black text-foreground text-sm mb-1 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                          <h3 className="font-black text-foreground text-sm mb-2 line-clamp-1 group-hover:text-indigo-600 transition-colors">
                             {g.title}
                           </h3>
-                          <div className="flex items-center gap-2 mb-3 text-[9px] font-black uppercase">
-                            <span className="text-indigo-500">★ {getAverageRating(g).toFixed(1)}</span>
-                            <span className="text-muted-foreground">{g.release_date ? new Date(g.release_date).getFullYear() : "TBA"}</span>
-                          </div>
-                          <div className="mt-auto flex items-center justify-between">
-                            <span className="px-2 py-0.5 bg-muted text-muted-foreground text-[9px] font-black rounded-md uppercase truncate max-w-[80px]">
-                              {GAME_CATEGORIES.find((s) => s.slug === g.categories?.[0])?.name || g.categories?.[0]}
+                          
+                          {/* 직관적인 점수 표기 영역 */}
+                          <div className="flex items-center gap-2.5 mb-3 text-[10px] font-black uppercase">
+                            <span className="flex items-center gap-1.5 text-indigo-500" title="GameSeed 유저 평점">
+                              <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-sm text-[8px]">GameSeed</span>
+                              <span>★ {siteRating > 0 ? siteRating.toFixed(1) : "0.0"}</span>
                             </span>
-                            <div className="text-[9px] font-bold text-muted-foreground group-hover:text-indigo-600 transition-colors">
+
+                            {displayScore > 0 && <span className="text-muted-foreground/30">|</span>}
+
+                            {displayScore > 0 && (
+                              <span className={cn("flex items-center gap-1.5", displayScore >= 80 ? "text-emerald-500" : displayScore >= 50 ? "text-amber-500" : "text-rose-500")} title="전문가 메타스코어">
+                                <span className="px-1.5 py-0.5 bg-current/10 rounded-sm text-[8px] opacity-90">META</span>
+                                <span>{displayScore}점</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* ⭐ 이 부분이 변경되었습니다! */}
+                          <div className="mt-auto flex items-center justify-between overflow-hidden">
+                            <div className="flex items-center gap-2 overflow-hidden pr-2">
+                              {/* 태그 한 줄 나열 (truncate) 및 툴팁 */}
+                              <span 
+                                className="px-2 py-0.5 bg-muted text-muted-foreground text-[9px] font-black rounded-md uppercase truncate"
+                                title={g.categories?.map((cat) => GAME_CATEGORIES.find((s) => s.slug === cat)?.name || cat).join(', ')}
+                              >
+                                {g.categories?.map((cat) => GAME_CATEGORIES.find((s) => s.slug === cat)?.name || cat).join(' • ')}
+                              </span>
+                              
+                              {/* 플레이 타임 / 출시일 */}
+                              {myPlaytime > 0 ? (
+                                <span className="shrink-0 text-indigo-500/80 text-[9px] font-black flex items-center gap-0.5"><Icons.Clock /> {(myPlaytime / 60).toFixed(1)}H</span>
+                              ) : (
+                                <span className="shrink-0 text-muted-foreground text-[9px] font-black">{g.release_date ? new Date(g.release_date).getFullYear() : "TBA"}</span>
+                              )}
+                            </div>
+                            <div className="text-[9px] font-bold text-muted-foreground group-hover:text-indigo-600 transition-colors shrink-0">
                               더보기 →
                             </div>
                           </div>
+
                         </div>
                       </div>
                     );
@@ -317,7 +406,7 @@ function ReviewContent() {
                   </div>
                 )}
 
-                {/* ⭐ 페이지네이션 (인디고 컬러 적용) */}
+                {/* 페이지네이션 */}
                 {filteredGames.length > 0 && (
                   <div className="mt-10 flex items-center justify-center gap-2 flex-wrap">
                     <button
@@ -409,7 +498,6 @@ function ReviewContent() {
   );
 }
 
-// 2. 외부로 내보내는 진짜 페이지 컴포넌트를 만들고, Suspense로 감싸줍니다!
 export default function ReviewPage() {
   return (
     <Suspense 

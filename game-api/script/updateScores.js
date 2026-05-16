@@ -1,23 +1,23 @@
+require('dotenv').config();
 const fetch = require('node-fetch');
 const supabase = require('./supabase');
 
-// RapidAPI 키 (없으면 비워둡니다)
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || ""; 
+// 1. RAWG API 키 가져오기
+const RAWG_API_KEY = process.env.RAWG_API_KEY;
 
-// 봇 차단 방지 헤더
-const COMMON_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Referer': 'https://opencritic.com/',
-  'Origin': 'https://opencritic.com'
-};
+if (!RAWG_API_KEY) {
+  console.error("🚨 에러: .env 파일에 RAWG_API_KEY를 설정해주세요!");
+  process.exit(1);
+}
 
-// 1. 스팀에서 영어 제목 가져오기
-async function getEnglishTitle(appId) {
+// 2. 한글 -> 영문 변환기 (스팀 무료 API)
+async function getSteamEnglishName(appId) {
   try {
-    const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=english`, { headers: COMMON_HEADERS });
-    const data = await res.json();
-    if (data[appId] && data[appId].success) {
-      return data[appId].data.name;
+    const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=english`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json[appId] && json[appId].success) {
+      return json[appId].data.name;
     }
   } catch (e) {
     return null;
@@ -25,109 +25,82 @@ async function getEnglishTitle(appId) {
   return null;
 }
 
-// 2. 오픈크리틱 (주소 수정됨: meta/search)
-async function fetchOpenCritic(title) {
+// 3. RAWG에서 메타크리틱 점수 가져오기
+async function fetchRawgMetacritic(title) {
   try {
-    // 검색
-    const searchUrl = `https://api.opencritic.com/api/meta/search?criteria=${encodeURIComponent(title)}`;
-    const searchRes = await fetch(searchUrl, { headers: COMMON_HEADERS });
-    
-    if (!searchRes.ok) return null;
-
-    const searchResults = await searchRes.json();
-    if (!searchResults || searchResults.length === 0) return null;
-
-    // 가장 정확한 결과 찾기
-    const gameId = searchResults[0].id;
-
-    // 상세 정보 조회
-    const detailUrl = `https://api.opencritic.com/api/game/${gameId}`;
-    const detailRes = await fetch(detailUrl, { headers: COMMON_HEADERS });
-    const info = await detailRes.json();
-
-    return info.medianScore ? Math.round(info.medianScore) : null; 
-  } catch (e) {
-    return null;
-  }
-}
-
-// 3. 메타크리틱 (RapidAPI 키 체크)
-async function fetchMetacritic(title) {
-  // 키가 없거나 기본값이면 실행하지 않음
-  if (!RAPIDAPI_KEY || RAPIDAPI_KEY.startsWith("process.env")) return null;
-  
-  try {
-    const url = `https://metacriticapi.p.rapidapi.com/search/${encodeURIComponent(title)}`;
-    const res = await fetch(url, {
-      headers: {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "metacriticapi.p.rapidapi.com"
-      },
-    });
-    
+    // RAWG API는 검색어와 키만 주면 다이렉트로 줍니다!
+    const searchUrl = `https://api.rawg.io/api/games?search=${encodeURIComponent(title)}&key=${RAWG_API_KEY}`;
+    const res = await fetch(searchUrl);
     if (!res.ok) return null;
-    const json = await res.json();
-    
-    if (json && json.length > 0 && json[0].score) {
-        return parseInt(json[0].score);
+
+    const data = await res.json();
+    if (data.results && data.results.length > 0) {
+      // 검색된 첫 번째 게임의 메타크리틱 점수를 반환
+      return data.results[0].metacritic || null;
     }
-    return null; 
+    return null;
   } catch (e) {
     return null;
   }
 }
 
 async function main() {
-  console.log("🚀 게임 점수 업데이트 시작...");
+  console.log("🚀 [RAWG API 모드] 메타크리틱 점수 초고속 수집 시작...\n");
 
-  // 1. DB에서 게임 가져오기
   const { data: games, error } = await supabase.from('games').select('*');
-  if (error) {
-    console.error("❌ DB 에러:", error.message);
-    return;
-  }
+  if (error) return console.error("DB 에러:", error.message);
 
-  console.log(`🎮 총 ${games.length}개 게임 처리 중...`);
-
-  let count = 0;
+  let successCount = 0;
 
   for (const game of games) {
-    // 스팀 ID 추출
-    const appIdMatch = game.image_url?.match(/\/apps\/(\d+)\//);
-    if (!appIdMatch) continue;
-    const appId = appIdMatch[1];
-
-    // 영어 제목 변환
-    const englishTitle = await getEnglishTitle(appId);
-    const searchTitle = englishTitle || game.title;
-
-    process.stdout.write(`🔍 [${game.title}] `);
-
-    // 점수 조회
-    const open = await fetchOpenCritic(searchTitle);
-    const meta = await fetchMetacritic(searchTitle);
-
-    // 결과 출력 및 저장
-    if (open !== null || meta !== null) {
-      await supabase
-        .from('games')
-        .update({ 
-          metacritic_score: meta, 
-          opencritic_score: open 
-        })
-        .eq('id', game.id);
-        
-      console.log(`✅ 저장 완료 (OpenCritic: ${open ?? '없음'}, Metacritic: ${meta ?? '키 없음'})`);
-      count++;
-    } else {
-      console.log(`⚠️ 점수 못 찾음`);
+    // ⭐ 최적화: 이미 점수가 채워진 게임은 스킵 (불필요한 호출 방지)
+    if (game.metacritic_score) {
+      console.log(`🔍 [${game.title}] ⏩ 이미 점수가 있어 건너뜀`);
+      continue;
     }
 
-    // 1초 대기
-    await new Promise(r => setTimeout(r, 1000));
+    process.stdout.write(`🔍 [${game.title}] `);
+    let targetTitle = game.title;
+
+    // 한글이 섞여있으면 영문으로 포장 (검색 정확도 상승)
+    const isKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(game.title);
+    if (isKorean && game.image_url) {
+      const appIdMatch = game.image_url.match(/\/(?:app|apps)\/(\d+)/);
+      if (appIdMatch) {
+        const steamAppId = appIdMatch[1];
+        const englishName = await getSteamEnglishName(steamAppId);
+        if (englishName) {
+          targetTitle = englishName;
+          process.stdout.write(`➔ 🔄 영문 변환(${targetTitle}) `);
+        }
+      }
+    }
+
+    // RAWG 검색!
+    const score = await fetchRawgMetacritic(targetTitle);
+
+    if (score !== null) {
+      // 🎯 기존 게임 DB의 'metacritic_score' 칸을 채워 넣습니다!
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ metacritic_score: score })
+        .eq('id', game.id);
+
+      if (updateError) {
+        console.log(`❌ DB 저장 실패: ${updateError.message}`);
+      } else {
+        console.log(`✅ 메타크리틱: [${score}점] 저장 완료! 🏆`);
+        successCount++;
+      }
+    } else {
+      console.log(`⚠️ 점수 없음 (출시 전이거나 메타크리틱 미등록)`);
+    }
+
+    // 봇 방어가 없어서 아주 짧게 0.5초만 쉬어도 충분합니다!
+    await new Promise(r => setTimeout(r, 500));
   }
 
-  console.log(`🎉 완료! 총 ${count}개 게임 점수 업데이트됨.`);
+  console.log(`\n🎉 작업 끝! 총 ${successCount}개 게임의 메타크리틱 점수를 업데이트했습니다.`);
 }
 
 main();

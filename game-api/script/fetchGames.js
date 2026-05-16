@@ -1,29 +1,18 @@
-// script/fetchGames.js
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const supabase = require('./supabase');
 
-// 1. 설정
-const TARGET_COUNT = 200; // 가져올 게임 수
-
-// 2. 딜레이 함수 (차단 방지)
+const TARGET_COUNT = 200; // 크롤링할 차트 목표 수
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ⭐ 3. 날짜 변환 함수 추가 (한국어 날짜 -> DB 형식)
-// 예: "2023년 12월 8일" -> "2023-12-08"
 function parseKoreanDate(dateStr) {
   if (!dateStr) return null;
   try {
-    // 년, 월, 일 글자 제거 및 공백 기준 분리
     const parts = dateStr.replace(/년|월|일/g, '').trim().split(/\s+/);
-    
-    // 연/월/일 3조각이 아니면(예: "출시 예정") null 반환
     if (parts.length < 3) return null;
-
     const y = parts[0];
-    const m = parts[1].padStart(2, '0'); // 한 자리 월을 두 자리로 (1 -> 01)
-    const d = parts[2].padStart(2, '0'); // 한 자리 일을 두 자리로 (5 -> 05)
-    
+    const m = parts[1].padStart(2, '0'); 
+    const d = parts[2].padStart(2, '0'); 
     return `${y}-${m}-${d}`;
   } catch (e) {
     return null;
@@ -31,46 +20,75 @@ function parseKoreanDate(dateStr) {
 }
 
 async function main() {
-  console.log('🚀 스팀 인기 게임 데이터 수집 시작...');
+  console.log('🚀 스팀 게임 데이터 누적 수집 시작...\n');
 
   try {
+    // ⭐ 0단계: DB에 이미 있는 게임 파악하기 (중복 덮어쓰기 방지)
+    const { data: existingGames, error: dbError } = await supabase.from('games').select('image_url, title');
+    if (dbError) throw dbError;
+
+    // 이미지 URL에서 스팀 App ID만 추출해서 Set에 담아둡니다.
+    const savedAppIds = new Set();
+    const savedTitles = new Set();
+    
+    existingGames.forEach(g => {
+      if (g.title) savedTitles.add(g.title);
+      if (g.image_url) {
+        const match = g.image_url.match(/\/(?:app|apps)\/(\d+)/);
+        if (match) savedAppIds.add(parseInt(match[1]));
+      }
+    });
+    
+    console.log(`✅ 현재 DB에 보존 중인 게임 수: ${savedAppIds.size}개 (이 게임들은 API 요청을 건너뜁니다)\n`);
+
     // ---------------------------------------------------------
-    // 1단계: 인기 게임 리스트 크롤링 (페이지당 50개씩)
+    // 1단계: 인기 게임 리스트 크롤링
     // ---------------------------------------------------------
     let appIds = [];
     let page = 1;
 
     while (appIds.length < TARGET_COUNT) {
       console.log(`🔍 인기 차트 ${page}페이지 크롤링 중...`);
-      
       const url = `https://store.steampowered.com/search/?filter=topsellers&category1=998&l=koreana&page=${page}`;
       const res = await fetch(url);
       const html = await res.text();
       const $ = cheerio.load(html);
 
+      let foundOnPage = 0;
       $('#search_resultsRows > a').each((i, el) => {
         if (appIds.length >= TARGET_COUNT) return false;
-        const appId = $(el).attr('data-ds-appid');
-        // 번들 패키지(여러개 묶음)는 건너뛰고 단일 게임만 수집
-        if (appId && !appId.includes(',')) {
-             appIds.push(parseInt(appId));
+        
+        const rawAppId = $(el).attr('data-ds-appid');
+        // 번들(여러 개 묶음) 제외
+        if (rawAppId && !rawAppId.includes(',')) {
+          appIds.push(parseInt(rawAppId));
+          foundOnPage++;
         }
       });
 
-      console.log(`   👉 현재까지 확보한 게임 ID: ${appIds.length}개`);
+      if (foundOnPage === 0) break; // 더 이상 게임이 없으면 탈출
       page++;
       await sleep(1000); 
     }
 
     appIds = [...new Set(appIds)]; 
-    console.log(`✅ 총 ${appIds.length}개의 고유 게임 ID 확보 완료! 상세 정보 조회를 시작합니다.`);
+    console.log(`\n✅ 차트에서 총 ${appIds.length}개의 게임 ID 확보 완료!`);
+
+    // ⭐ 핵심 필터링: 확보한 ID 중 이미 DB에 있는 건 빼버립니다.
+    const newAppIds = appIds.filter(id => !savedAppIds.has(id));
+    console.log(`⏩ 기존 게임 스킵 완료. 새롭게 추가할 신규 게임은 총 ${newAppIds.length}개 입니다.\n`);
+
+    if (newAppIds.length === 0) {
+      console.log("🎉 이미 인기 차트 게임들이 모두 DB에 있습니다! 스크립트를 종료합니다.");
+      return;
+    }
 
     // ---------------------------------------------------------
-    // 2단계: 상세 정보 조회 및 저장
+    // 2단계: 신규 게임 상세 정보 조회 및 '안전하게' 저장 (Insert)
     // ---------------------------------------------------------
     let processedCount = 0;
 
-    for (const appId of appIds) {
+    for (const appId of newAppIds) {
       try {
         const detailRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=koreana`);
         const detailData = await detailRes.json();
@@ -80,7 +98,12 @@ async function main() {
 
           if (game.type !== 'game') continue;
 
-          // ⭐ 날짜 추출 및 변환 로직
+          // 혹시나 ID가 달라도 이름이 똑같은 게임이 DB에 있다면 덮어쓰지 않고 스킵!
+          if (savedTitles.has(game.name)) {
+            console.log(`⚠️ [${game.name}] 동일한 이름의 게임이 이미 DB에 존재하여 스킵합니다.`);
+            continue;
+          }
+
           const rawDate = game.release_date ? game.release_date.date : null;
           const formattedDate = parseKoreanDate(rawDate);
 
@@ -89,31 +112,26 @@ async function main() {
             description: game.short_description,
             image_url: game.header_image,
             categories: game.genres ? game.genres.map(g => g.description) : [],
-            release_date: formattedDate, // ⭐ 여기에 추가됨!
-            // created_at은 Supabase가 자동 처리
+            release_date: formattedDate,
           };
 
-          // Supabase 저장
-          // title 대신 id를 기준으로 upsert 하는 것이 더 안전합니다 (게임명이 바뀔 수도 있으니)
-          // 하지만 기존 로직을 유지하려면 title 사용하셔도 됩니다.
-          const { error } = await supabase
-            .from('games')
-            .upsert(gamePayload, { onConflict: 'title' }); 
+          // ⭐ 덮어쓰기(upsert)가 아닌 순수 추가(insert) 사용! 
+          const { error } = await supabase.from('games').insert(gamePayload);
 
           if (error) {
-            console.error(`❌ [${game.name}] 저장 실패:`, error.message);
+            console.error(`❌ [${game.name}] DB 추가 실패:`, error.message);
           } else {
-            console.log(`💾 [${++processedCount}/${appIds.length}] 저장 완료: ${game.name} (${formattedDate || '날짜없음'})`);
+            console.log(`💾 [${++processedCount}/${newAppIds.length}] 신규 게임 추가 완료: ${game.name}`);
           }
         }
       } catch (err) {
         console.error(`⚠️ AppID ${appId} 처리 중 에러:`, err.message);
       }
 
-      await sleep(1500); // 1.5초 대기
+      await sleep(1500); // API 차단 방지를 위한 휴식
     }
 
-    console.log('🎉 모든 작업이 완료되었습니다!');
+    console.log(`\n🎉 모든 작업이 완료되었습니다! (새로 추가된 게임: ${processedCount}개)`);
 
   } catch (error) {
     console.error('❌ 치명적 오류 발생:', error);
