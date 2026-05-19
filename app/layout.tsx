@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next"; // ⭐ Viewport 타입 추가됨
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "./components/Header"; 
 import { ThemeProvider } from "./components/ThemeProvider";
 import RecentTabs from "./components/RecentTabs";
-
-// ⭐ 1. 우리가 새로 만든 ToastProvider 불러오기
 import { ToastProvider } from "./components/ToastProvider";
-
 import FloatingChat from "./components/FloatingChat";
 
 const geistSans = Geist({
@@ -19,6 +16,16 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+// ⭐ 주소창 다크모드 연동을 위한 설정 추가
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' }, // 라이트 모드 주소창 (흰색)
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },  // 다크 모드 주소창 (어두운 회색)
+  ],
+  width: 'device-width',
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "GameSeed",
@@ -38,7 +45,6 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          {/* ⭐ 2. ToastProvider로 전체 화면을 감싸줍니다. */}
           <ToastProvider>
             {/* 상단 네비게이션 헤더 */}
             <Header />
