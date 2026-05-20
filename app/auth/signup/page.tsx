@@ -35,13 +35,42 @@ export default function SignupPage() {
     setErrorMsg(null);
 
     try {
+      // 1. 기본 유효성 검사
       if (password !== confirmPassword) {
         throw new Error("비밀번호가 일치하지 않습니다.");
       }
       if (password.length < 6) {
         throw new Error("비밀번호는 6자 이상이어야 합니다.");
       }
+      if (!username.trim() || !nickname.trim()) {
+        throw new Error("아이디와 닉네임을 모두 입력해주세요.");
+      }
 
+      // ⭐ 2. 아이디(username) 중복 검사 (DB 확인)
+      const { data: existingUser, error: checkUserError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("username", username.trim())
+        .maybeSingle();
+
+      if (existingUser) {
+        throw new Error("이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.");
+      }
+      if (checkUserError) console.error("아이디 중복 검사 에러:", checkUserError);
+
+      // ⭐ 3. 닉네임(nickname) 중복 검사 (DB 확인)
+      const { data: existingNickname, error: checkNickError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("nickname", nickname.trim())
+        .maybeSingle();
+
+      if (existingNickname) {
+        throw new Error("이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.");
+      }
+      if (checkNickError) console.error("닉네임 중복 검사 에러:", checkNickError);
+
+      // 4. 프로필 이미지 업로드 로직
       let avatarUrl = "";
 
       if (profileImage) {
@@ -59,13 +88,14 @@ export default function SignupPage() {
         avatarUrl = data.publicUrl;
       }
 
+      // 5. 최종 회원가입(인증) 요청
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username,
-            nickname,
+            username: username.trim(),
+            nickname: nickname.trim(),
             avatar_url: avatarUrl,
           },
         },
@@ -82,10 +112,8 @@ export default function SignupPage() {
   };
 
   return (
-    // ⭐ [배경] bg-gradient-to-br from-indigo-50 ... -> bg-background
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4 py-10 transition-colors duration-300">
       
-      {/* ⭐ [카드] bg-white -> bg-card, 테두리 border-border */}
       <div className="max-w-md w-full bg-card rounded-3xl shadow-lg overflow-hidden border border-border p-8 transition-colors">
         
         <div className="text-center mb-6">
@@ -114,7 +142,6 @@ export default function SignupPage() {
             {/* 📸 프로필 사진 업로드 */}
             <div className="flex flex-col items-center mb-6">
               <label className="relative cursor-pointer group">
-                {/* ⭐ [이미지 업로드 영역] bg-muted 적용 */}
                 <div className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center overflow-hidden hover:border-primary transition-colors">
                   {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -144,7 +171,6 @@ export default function SignupPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                // ⭐ [입력창] bg-muted, text-foreground 명시하여 글씨가 잘 보이도록 수정
                 className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-colors font-medium text-foreground placeholder:text-muted-foreground"
                 placeholder="사용할 아이디 입력"
               />
@@ -212,7 +238,6 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              // ⭐ [버튼] 시스템 primary 색상 사용
               className={`w-full py-3.5 mt-6 rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.98] ${
                 loading 
                   ? "bg-muted text-muted-foreground cursor-not-allowed" 
