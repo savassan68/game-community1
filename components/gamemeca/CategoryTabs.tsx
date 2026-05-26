@@ -10,7 +10,7 @@ type Props = {
 const categories: { label: string; value: NewsCategory }[] = [
   { label: "메인", value: "main" },
   { label: "산업", value: "industry" },
-  { label: "eSports", value: "esports" },
+  { label: "e스포츠", value: "esports" },
   { label: "PC", value: "pc" },
   { label: "모바일", value: "mobile" },
   { label: "콘솔", value: "console" },

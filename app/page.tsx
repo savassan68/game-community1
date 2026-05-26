@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
-// ⭐ 1. Next.js 이미지 최적화 및 프록시 우회 컴포넌트 불러오기
 import Image from "next/image"; 
 
 /** ⭐ 아이콘 및 로더 컴포넌트 */
@@ -25,17 +24,72 @@ type TopGame = { id: number; title: string; image_url?: string; metacritic_score
 const NEWS_CATEGORIES = [
   { id: "main", label: "전체" },
   { id: "industry", label: "산업" },
-  { id: "esports", label: "eSports" },
+  { id: "esports", label: "e스포츠" },
   { id: "pc", label: "PC" },
   { id: "mobile", label: "모바일" },
   { id: "console", label: "콘솔" },
 ];
 
-/** ⭐ 유틸리티 함수: 날짜 포맷 (Hydration Error 방지) */
+/** ⭐ 유틸리티 함수: 날짜 포맷 */
 const formatDate = (dateString?: string) => {
   if (!dateString) return "";
   const date = new Date(dateString);
   return `${date.getFullYear().toString().slice(-2)}.${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getDate().toString().padStart(2, '0')}`;
+};
+
+/** ⭐ 메인 페이지 전용: 이미지 지연 로딩 뉴스 카드 컴포넌트 */
+const MainNewsCard = ({ n, router }: { n: any, router: any }) => {
+  const [imgSrc, setImgSrc] = useState(n.imageUrl);
+  const [isImgLoading, setIsImgLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRealImage = async () => {
+      if (!n.imageUrl?.includes("unsplash")) {
+        setIsImgLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/news/article?url=${encodeURIComponent(n.articleUrl)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.imageUrl) setImgSrc(data.imageUrl);
+        }
+      } catch (error) {}
+      finally { if (isMounted) setIsImgLoading(false); }
+    };
+    fetchRealImage();
+    return () => { isMounted = false; };
+  }, [n.articleUrl, n.imageUrl]);
+
+  return (
+    <div onClick={() => router.push(`/news/detail?url=${encodeURIComponent(n.articleUrl)}`)} className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border">
+      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border relative">
+        {imgSrc ? (
+          <>
+            <div className={`absolute inset-0 transition-opacity duration-500 z-10 ${isImgLoading ? "opacity-50 bg-slate-200 animate-pulse" : "opacity-0"}`} />
+            <Image 
+              src={imgSrc} 
+              alt={n.title} 
+              fill
+              unoptimized
+              className="object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+          </>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center relative z-10"><Icons.Image /></div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {n.category && <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase">{n.category}</span>}
+          <span className="text-[11px] text-muted-foreground">{n.createdAt}</span>
+        </div>
+        <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">{n.title}</h3>
+        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.summary}</p>
+      </div>
+    </div>
+  );
 };
 
 export default function HomePage() {
@@ -72,7 +126,7 @@ export default function HomePage() {
   const fetchNews = useCallback(async () => {
     setNewsLoading(true);
     try {
-      const res = await fetch(`/api/gamemeca/list?category=${activeNewsCategory}`);
+      const res = await fetch(`/api/news/list?category=${activeNewsCategory}`);
       if (!res.ok) throw new Error("네트워크 응답 에러");
       const data = await res.json();
       setNews(Array.isArray(data) ? data : []);
@@ -93,7 +147,6 @@ export default function HomePage() {
     const loadMainData = async () => {
       setIsMainLoading(true);
       try {
-        // 1. 인기 게임 로드
         const gamesRes = await supabase.from("games")
           .select("id, title, image_url, metacritic_score, opencritic_score")
           .not("image_url", "is", null)
@@ -110,14 +163,12 @@ export default function HomePage() {
           setTopGames(sorted);
         }
 
-        // 2. 최신 평론 로드
         const latestRev = await supabase.from("reviews")
           .select("*, games(title)")
           .order("created_at", { ascending: false })
           .limit(8);
         if (latestRev.data) setLatestReviews(latestRev.data as Review[]);
 
-        // 3. 인기 평론 로드 (최근 7일)
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         const topRev = await supabase.from("reviews")
@@ -127,7 +178,6 @@ export default function HomePage() {
           .limit(4);
         if (topRev.data) setTopReviews(topRev.data as Review[]);
 
-        // 4. 최신 커뮤니티 로드
         const latestCom = await supabase.from("community")
           .select("*, comments(count)")
           .order("created_at", { ascending: false })
@@ -139,7 +189,6 @@ export default function HomePage() {
           })) as Community[]);
         }
 
-        // 5. 인기 커뮤니티 로드 (최근 7일)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const topCom = await supabase.from("community")
@@ -167,7 +216,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
-        {/* 섹션: 이번 주 인기 게임 (기존 스켈레톤 유지) */}
+        {/* 섹션: 이번 주 인기 게임 */}
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-4 px-1">
             <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -191,7 +240,6 @@ export default function HomePage() {
                     className="flex-shrink-0 w-[75vw] sm:w-auto snap-center group relative h-44 sm:h-48 lg:h-52 rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border bg-card"
                   >
                     {game.image_url ? (
-                      // ⭐ 2. <img> 대신 <Image> 컴포넌트 사용 (모바일 차단 완벽 우회)
                       <Image 
                         src={game.image_url} 
                         alt={game.title} 
@@ -255,30 +303,8 @@ export default function HomePage() {
                   ))
                 ) : news.length > 0 ? (
                   news.slice(0, 4).map((n) => (
-                    <div key={n.id} onClick={() => router.push(`/news/detail?url=${encodeURIComponent(n.articleUrl)}`)} className="flex gap-4 p-3 hover:bg-accent/50 transition-colors rounded-xl cursor-pointer group border border-transparent hover:border-border">
-                      {/* ⭐ 3. 뉴스 썸네일도 <Image>로 교체 (relative 추가) */}
-                      <div className="flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 rounded-lg overflow-hidden bg-muted border border-border relative">
-                        {n.imageUrl ? (
-                          <Image 
-                            src={n.imageUrl} 
-                            alt={n.title} 
-                            fill
-                            unoptimized
-                            className="object-cover group-hover:scale-105 transition-transform duration-500" 
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center relative z-10"><Icons.Image /></div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {n.category && <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase">{n.category}</span>}
-                          <span className="text-[11px] text-muted-foreground">{n.createdAt}</span>
-                        </div>
-                        <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 mb-1">{n.title}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.summary}</p>
-                      </div>
-                    </div>
+                    /* ⭐ 새로 만든 MainNewsCard 컴포넌트를 사용합니다! */
+                    <MainNewsCard key={n.id} n={n} router={router} />
                   ))
                 ) : <div className="text-sm text-center py-10 border border-dashed rounded-xl border-border">뉴스가 없습니다.</div>}
               </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import Image from "next/image"; // ⭐ Next.js Image 추가
-import { fetchGameMecaArticle } from "@/lib/gamemeca";
+import Image from "next/image"; 
+// ⭐ 1. 옛날 gamemeca 폴더 대신, 새로 만든 naverNews 서비스에서 함수를 가져옵니다!
+import { fetchGameMecaArticle } from "@/lib/services/naverNews";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -63,11 +64,14 @@ export default async function NewsDetailPage({ searchParams }: Props) {
             </h1>
             
             <div className="flex flex-wrap items-center gap-4 text-sm font-bold mb-5">
-              <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg uppercase tracking-wider">GameMeca</span>
+              {/* ⭐ 2. 출처 뱃지를 NAVER NEWS로 변경 */}
+              <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg uppercase tracking-wider">
+                NAVER NEWS
+              </span>
               <span className="text-slate-400">{article.createdAt || "날짜 정보 없음"}</span>
             </div>
 
-            {/* ⭐ 출처 명시 박스 */}
+            {/* 출처 명시 박스 */}
             <div className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden">
               <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 whitespace-nowrap flex items-center gap-1.5 flex-shrink-0">
                 <Icons.ExternalLink /> 기사 원문 출처
@@ -76,7 +80,7 @@ export default async function NewsDetailPage({ searchParams }: Props) {
               <a
                 href={article.articleUrl}
                 target="_blank"
-                rel="noopener noreferrer" // ⭐ 보안 속성 필수 추가
+                rel="noopener noreferrer"
                 className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate"
                 title={article.articleUrl}
               >
@@ -85,20 +89,20 @@ export default async function NewsDetailPage({ searchParams }: Props) {
             </div>
           </header>
 
-          {/* ⭐ 썸네일 이미지 최적화 */}
+          {/* 썸네일 이미지 */}
           {article.imageUrl && (
             <div className="mb-10 relative w-full overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shadow-sm aspect-video">
               <Image
                 src={article.imageUrl}
                 alt={article.title}
                 fill
-                priority // 메인 이미지이므로 렌더링 우선순위 부여
+                priority 
+                unoptimized /* ⭐ 3. 언론사별로 제각각인 외부 이미지 도메인 에러를 막기 위해 추가 */
                 sizes="(max-width: 768px) 100vw, 800px"
                 className="object-cover"
               />
             </div>
           )}
-
 
           {/* 본문 내용 출력 (Tailwind Typography 적용) */}
           <div

@@ -23,33 +23,45 @@ export default function NewsPage() {
   const ITEMS_PER_PAGE = 10;
   const listTopRef = useRef<HTMLDivElement>(null);
 
-  // ⭐ API 최적화 1: 불필요한 중복 요청을 줄이기 위해 AbortController 사용 (옵션이지만 추천)
   const enrichItem = useCallback(async (item: GameMecaListItem): Promise<GameMecaListItem> => {
     if (item.summary && item.createdAt && item.imageUrl) return item;
     try {
-      // ⭐ API 최적화 2: next의 캐시 기능 활용 (5분(300초)마다 새로고침되도록 revalidate 설정)
-      const res = await fetch(`/api/gamemeca/article?url=${encodeURIComponent(item.articleUrl)}`, {
+      // ⭐ API 주소를 /api/news/article 로 변경
+      const res = await fetch(`/api/news/article?url=${encodeURIComponent(item.articleUrl)}`, {
         next: { revalidate: 300 } 
       });
-      if (res.ok) {
-        const detail = await res.json();
-        return { ...item, summary: item.summary || detail.summary || "", createdAt: item.createdAt || detail.createdAt || "", imageUrl: item.imageUrl || detail.imageUrl || "" };
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error("🚨 상세 기사 조회 에러:", res.status, errData);
+        return item;
       }
-    } catch (e) { console.error(e); }
+      const detail = await res.json();
+      return { ...item, summary: item.summary || detail.summary || "", createdAt: item.createdAt || detail.createdAt || "", imageUrl: item.imageUrl || detail.imageUrl || "" };
+    } catch (e) { 
+      console.error("🚨 상세 기사 fetch 실패:", e); 
+    }
     return item;
   }, []);
 
   useEffect(() => {
     const loadHeroData = async () => {
       try {
-        // ⭐ 메인 뉴스도 캐싱 적용
-        const res = await fetch("/api/gamemeca/list?category=main", { next: { revalidate: 300 } });
+        // ⭐ API 주소를 /api/news/list 로 변경
+        const res = await fetch("/api/news/list?category=main", { next: { revalidate: 300 } });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("🚨 메인 뉴스 리스트 에러:", res.status, errData);
+          throw new Error(`상태 코드: ${res.status}`);
+        }
+        
         const data = await res.json();
-        if (res.ok && Array.isArray(data)) {
+        if (Array.isArray(data)) {
           const enriched = await Promise.all(data.slice(0, 5).map(item => enrichItem(item)));
           setMainItems(enriched);
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+        console.error("🚨 메인 뉴스 데이터 로딩 실패:", err); 
+      }
     };
     loadHeroData();
   }, [enrichItem]);
@@ -59,11 +71,21 @@ export default function NewsPage() {
       setLoading(true);
       setCurrentPage(1);
       try {
-        const res = await fetch(`/api/gamemeca/list?category=${activeCategory}`, { next: { revalidate: 300 } });
+        // ⭐ API 주소를 /api/news/list 로 변경
+        const res = await fetch(`/api/news/list?category=${activeCategory}`, { next: { revalidate: 300 } });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error(`🚨 카테고리(${activeCategory}) 뉴스 에러:`, res.status, errData);
+          throw new Error(`상태 코드: ${res.status}`);
+        }
+        
         const data = await res.json();
-        if (res.ok && Array.isArray(data)) setCategoryItems(data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+        if (Array.isArray(data)) setCategoryItems(data);
+      } catch (err) { 
+        console.error("🚨 카테고리 뉴스 데이터 로딩 실패:", err); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     loadCategoryData();
   }, [activeCategory]);
@@ -91,17 +113,14 @@ export default function NewsPage() {
       
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
         
-        {/* 배너 섹션 */}
         <section className="mb-6">
           <div className="rounded-[2rem] overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 relative">
-            {/* ⭐ 로딩 중일 때 깜빡임을 방지하는 최소 높이 설정 */}
             <div className="min-h-[300px]">
                <MainHero items={mainItems.slice(0, 3)} />
             </div>
           </div>
         </section>
 
-        {/* 카테고리 탭 (스티키) */}
         <div className="sticky top-[64px] z-30 py-3 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md mb-4">
           <div className="p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm w-fit mx-auto">
             <CategoryTabs activeCategory={activeCategory} onChange={setActiveCategory} />
@@ -112,7 +131,6 @@ export default function NewsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* 뉴스 리스트 */}
           <section className="lg:col-span-8 space-y-4">
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
               {loading ? (
@@ -123,12 +141,17 @@ export default function NewsPage() {
               ) : (
                 <>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {currentItems.map((item) => (
-                      <NewsListItem key={item.articleUrl} item={item} />
-                    ))}
+                    {currentItems.length > 0 ? (
+                      currentItems.map((item) => (
+                        <NewsListItem key={item.articleUrl} item={item} />
+                      ))
+                    ) : (
+                      <div className="py-20 text-center text-slate-400 font-medium">
+                        뉴스를 불러오지 못했습니다.
+                      </div>
+                    )}
                   </div>
 
-                  {/* 페이지네이션 */}
                   {totalPages > 1 && (
                     <div className="py-8 flex justify-center items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
                       <button 
@@ -169,7 +192,6 @@ export default function NewsPage() {
             </div>
           </section>
 
-          {/* 사이드바 */}
           <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-28">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm">
               <RightSidebar 

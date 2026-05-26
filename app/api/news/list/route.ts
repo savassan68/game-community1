@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchGameMecaList, NewsCategory } from "@/lib/gamemeca";
+import { fetchNaverNewsList, NewsCategory } from "@/lib/services/naverNews";
 
 export async function GET(req: NextRequest) {
   try {
-    const category =
-      (req.nextUrl.searchParams.get("category") as NewsCategory) || "main";
+    const category = (req.nextUrl.searchParams.get("category") as NewsCategory) || "main";
 
     const allowed: NewsCategory[] = [
-      "main",
-      "industry",
-      "esports",
-      "pc",
-      "mobile",
-      "console",
+      "main", "industry", "esports", "pc", "mobile", "console",
     ];
 
     if (!allowed.includes(category)) {
@@ -22,11 +16,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const items = await fetchGameMecaList(category);
+    const items = await fetchNaverNewsList(category);
     return NextResponse.json(items, { status: 200 });
+    
   } catch (error) {
-    console.error("gamemeca list api error:", error);
-
+    console.error("news list api error:", error);
     return NextResponse.json(
       {
         error: "기사 목록을 가져오지 못했습니다.",

@@ -17,7 +17,6 @@ const Icons = {
   Mail: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   Logout: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
   UserIconLg: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
-  // ⭐ 새 알림이 있을 때 흔들리는 효과 추가 (isRinging)
   Bell: ({ isRinging }: { isRinging?: boolean }) => (
     <svg className={`w-5 h-5 ${isRinging ? 'origin-top animate-bounce text-indigo-600 dark:text-indigo-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -29,12 +28,10 @@ const Icons = {
 const NAV_MENUS = [
   { path: "community", label: "커뮤니티" },
   { path: "review", label: "평론" },
-  // { path: "user-review", label: "유저 리뷰" }, // ⭐ 베타 테스트 기간 동안 임시 숨김 처리
   { path: "recommend", label: "AI 추천" },
   { path: "news", label: "뉴스" },
 ];
 
-// ⭐ 알림 타입에 "notice" 추가
 type Notification = {
   id: number;
   type: "comment" | "reply" | "message" | "notice"; 
@@ -57,6 +54,29 @@ export default function Header() {
   const [headerSearch, setHeaderSearch] = useState("");
   const [notiTab, setNotiTab] = useState<"noti" | "message">("noti");
 
+  // ⭐ 온보딩 강제 이동 (검문소 로직 추가)
+  useEffect(() => {
+    const checkProfileCompleteness = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("nickname, username")
+          .eq("id", session.user.id)
+          .single();
+
+        // 닉네임이나 아이디가 없고, 현재 온보딩 페이지(/auth/setup)가 아닐 경우 강제 리다이렉트
+        if ((!profile?.nickname || !profile?.username) && pathname !== "/auth/setup") {
+          router.replace("/auth/setup");
+        }
+      }
+    };
+
+    checkProfileCompleteness();
+  }, [pathname, router]);
+
+  // 기존 Auth 체크 로직
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -171,7 +191,6 @@ export default function Header() {
               <div className="flex items-center gap-1.5 sm:gap-3">
                 <div className="relative">
                   
-                  {/* ⭐ 안 읽은 알림이 있을 때 종 흔들림 (isRinging) */}
                   <button onClick={() => { setIsNotiMenuOpen(!isNotiMenuOpen); setIsUserMenuOpen(false); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all relative ${isNotiMenuOpen ? "bg-indigo-600 text-white shadow-lg scale-105" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
                     <Icons.Bell isRinging={unreadCount > 0} />
                     {unreadCount > 0 && <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-rose-500 border-2 border-white dark:border-slate-900"></span>}
@@ -191,7 +210,6 @@ export default function Header() {
                               <li key={noti.id} onClick={() => handleNotiClick(noti)} className={`px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 flex gap-3 items-center ${noti.is_read ? 'opacity-50' : 'bg-indigo-50/20 dark:bg-indigo-900/10'}`}>
                                 <div className="flex-1 min-w-0 pr-1">
                                   
-                                  {/* ⭐ 알림 타입이 notice일 때 전용 UI 출력 */}
                                   {noti.type === 'notice' ? (
                                     <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-snug">
                                       <span className="font-extrabold text-indigo-600 dark:text-indigo-400">📢 공지사항</span> - {noti.message}
@@ -240,7 +258,6 @@ export default function Header() {
                 </div>
               </div>
             ) : (
-              // ⭐ hidden sm:flex 를 추가해서 모바일에서는 숨기고, whitespace-nowrap으로 줄바꿈을 막습니다.
               <div className="hidden sm:flex gap-2">
                 <button onClick={() => router.push("/auth/login")} className="whitespace-nowrap text-sm font-semibold text-slate-600 dark:text-slate-300 px-3 py-2 hover:text-indigo-600 transition-colors">로그인</button>
                 <button onClick={() => router.push("/auth/signup")} className="whitespace-nowrap text-sm font-semibold text-white bg-indigo-600 px-4 py-2 rounded-full hover:bg-indigo-700 shadow-md">회원가입</button>
