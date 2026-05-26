@@ -66,8 +66,10 @@ export default function RecommendPage() {
       const { data, error } = await supabase.functions.invoke("GameRecommend", {
         body: { 
           mode, 
-          selections, 
-          userInput, 
+          // [기능 수정]: 맞춤 설정 모드가 아닐 때는 빈 객체를 보내 문장 추천의 정확도를 보장합니다.
+          selections: mode === "logic" ? selections : {}, 
+          // [기능 수정]: 자율 묘사 모드가 아닐 때는 입력 텍스트를 비워서 보냅니다.
+          userInput: mode === "sentence" ? userInput : "", 
           isRetry: retry,
           excludeTitles: currentExcludeList // 서버로 제외 목록 전달
         },
@@ -75,14 +77,15 @@ export default function RecommendPage() {
       if (error) throw error;
       setRecommendations(data.recommendations);
     } catch (err) {
-      alert("추천 정보를 가져오는 중 오류가 발생했습니다.");
+      alert("推薦 정보를 가져오는 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  const isAllSelected = QUESTIONS.every(q => selections[q.id]);
+  // [기능 수정]: 모든 카테고리가 아닌 최소 1개 이상의 카테고리만 고르면 활성화되도록 변경
+  const isAnySelected = Object.keys(selections).length > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans tracking-tight">
@@ -95,7 +98,20 @@ export default function RecommendPage() {
         <div className="bg-card border border-border rounded-[3rem] p-10 sm:p-14 shadow-2xl mb-16 relative">
           <div className="flex p-1.5 bg-muted rounded-2xl mb-12 max-w-[280px] mx-auto border border-border">
             {(["logic", "sentence"] as const).map(m => (
-              <button key={m} onClick={() => setMode(m)} className={`flex-1 py-2.5 ${FONT_STYLE.actionButton} rounded-xl transition-all ${mode === m ? "bg-card shadow-sm text-primary" : "text-muted-foreground"}`}>
+              <button 
+                key={m} 
+                onClick={() => {
+                  setMode(m);
+                  // [기능 수정]: 탭을 바꿀 때 다른 모드의 데이터를 깔끔하게 초기화하여 상호 간섭을 막습니다.
+                  if (m === "sentence") {
+                    setSelections({});
+                  } else {
+                    setUserInput("");
+                  }
+                  setConflictError("");
+                }} 
+                className={`flex-1 py-2.5 ${FONT_STYLE.actionButton} rounded-xl transition-all ${mode === m ? "bg-card shadow-sm text-primary" : "text-muted-foreground"}`}
+              >
                 {m === "logic" ? "맞춤 설정" : "자율 묘사"}
               </button>
             ))}
@@ -110,7 +126,18 @@ export default function RecommendPage() {
                     {q.options.map(opt => (
                       <button
                         key={opt}
-                        onClick={() => setSelections(prev => ({ ...prev, [q.id]: opt }))}
+                        onClick={() => 
+                          // [기능 수정]: 이미 고른 버튼을 다시 누르면 선택이 해제(토글)되도록 변경
+                          setSelections(prev => {
+                            const next = { ...prev };
+                            if (next[q.id] === opt) {
+                              delete next[q.id];
+                            } else {
+                              next[q.id] = opt;
+                            }
+                            return next;
+                          })
+                        }
                         className={`px-7 py-4 rounded-[1.25rem] text-sm font-bold transition-all border-2 ${selections[q.id] === opt ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-muted/20 border-transparent hover:border-border text-muted-foreground"}`}
                       >
                         {opt}
@@ -131,7 +158,8 @@ export default function RecommendPage() {
 
           <button 
             onClick={() => handleGetRecommendation(false)} 
-            disabled={isLoading || !!conflictError || (mode === "logic" && !isAllSelected)} 
+            // [기능 수정]: 비활성화 조건을 모든 선택(isAllSelected)에서 최소 1개 선택(isAnySelected)으로 변경
+            disabled={isLoading || !!conflictError || (mode === "logic" && !isAnySelected)} 
             className={`w-full mt-16 py-7 bg-primary text-primary-foreground ${FONT_STYLE.actionButton} rounded-[2.25rem] hover:scale-[1.01] active:scale-[0.98] transition-all shadow-xl shadow-primary/30 disabled:opacity-30 text-base`}
           >
             {isLoading ? "분석 중..." : "추천 리포트 생성"}
