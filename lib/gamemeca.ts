@@ -70,7 +70,7 @@ function cleanText(value?: string) {
   return (value || "").replace(/\s+/g, " ").trim();
 }
 
-function extractImageFromElement(root: cheerio.Cheerio<any>) {
+function extractImageFromElement(root: any) {
   const img = root.find("img").first();
   if (!img.length) return "";
 
