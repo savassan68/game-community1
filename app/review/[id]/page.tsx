@@ -17,7 +17,6 @@ const Icons = {
 type Review = { id: number; content: string; rating: number; author: string; user_id: string | null; created_at: string; game_id?: number; likes?: number; playtime?: number; };
 type Game = { id: number; title: string; description: string; image_url: string; categories: string[]; metacritic_score?: number; opencritic_score?: number; gameseed_score?: number; recommend_count?: number; average_rating?: number; };
 
-// ⭐ 타입 업데이트: content_ko (한국어 번역본) 추가
 type CriticReview = { id: number; outlet: string; author: string; rating: number; content: string; content_ko?: string | null; url: string; };
 
 export default function GameDetailPage() {
@@ -46,7 +45,6 @@ export default function GameDetailPage() {
   const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
   const toggleReview = (key: string) => setExpandedReviews(prev => ({ ...prev, [key]: !prev[key] }));
   
-  // ⭐ 원문 보기 토글 상태 추가
   const [showOriginal, setShowOriginal] = useState<Record<string, boolean>>({});
   const toggleOriginal = (key: string) => setShowOriginal(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -248,7 +246,6 @@ export default function GameDetailPage() {
             </>
         </section>
 
-        {/* ... 유저 평론 작성 섹션은 기존과 완벽히 동일 (생략 없이 유지) ... */}
         <section className="bg-card p-6 rounded-3xl border border-border shadow-sm relative overflow-hidden group transition-colors mb-10">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-purple-500"></div>
           <div className="flex items-center justify-between mb-5">
@@ -317,7 +314,6 @@ export default function GameDetailPage() {
         </div>
 
         <div className="min-h-[400px]">
-          {/* ... GameSeed 리뷰 영역 (생략 없이 동일) ... */}
           {activeReviewTab === "gameseed" && (
             <div className="space-y-4 animate-fade-in">
               {siteReviews.length > 0 ? siteReviews.map((r) => (
@@ -376,14 +372,14 @@ export default function GameDetailPage() {
             </div>
           )}
 
-          {/* ... 스팀 리뷰 영역 (생략 없이 동일) ... */}
+          {/* 스팀 리뷰 (글자 수 기준 160자로 상향) */}
           {activeReviewTab === "steam" && (
             <div className="space-y-4 animate-fade-in">
               {steamReviews.length > 0 ? (
                 <>
                   {steamReviews.slice(0, visibleSteamCount).map((r) => {
                     const content = cleanSteamContent(r.content);
-                    const isLong = content.length > 150; 
+                    const isLong = content.length > 160; // ⭐ 160자로 상향
                     const isExpanded = expandedReviews[`steam_${r.id}`];
                     return (
                       <div key={r.id} className="bg-card p-5 rounded-3xl border border-border shadow-sm flex gap-4 group transition-all">
@@ -394,7 +390,7 @@ export default function GameDetailPage() {
                             <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">{new Date(r.created_at).toLocaleDateString()}</span>
                           </div>
                           <p className={`text-sm text-foreground/70 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>{content}</p>
-                          {isLong && <button onClick={() => toggleReview(`steam_${r.id}`)} className="text-xs font-bold text-blue-500 hover:underline mt-1.5 transition-colors">{isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}</button>}
+                          {isLong && <button onClick={() => toggleReview(`steam_${r.id}`)} className="text-xs font-bold text-blue-500 hover:underline mt-2 transition-colors">{isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}</button>}
                         </div>
                       </div>
                     );
@@ -405,16 +401,14 @@ export default function GameDetailPage() {
             </div>
           )}
 
-          {/* ⭐ 전문가 평론 영역 (한글/영문 토글 기능이 추가된 핵심 부분) */}
+          {/* 전문가 평론 영역 (더보기 글자수 상향 및 버튼 레이아웃 고정) */}
           {activeReviewTab === "critic" && (
             <div className="space-y-4 animate-fade-in">
               {criticReviews.slice(0, visibleCriticCount).map((cr) => {
                 const isShowingOriginal = showOriginal[`critic_${cr.id}`];
-                
-                // ⭐ 번역본(content_ko)이 있고, '원문보기' 상태가 아니면 한국어를 보여주고, 아니면 영어를 보여줍니다!
                 const displayContent = (!isShowingOriginal && cr.content_ko) ? cr.content_ko : cr.content;
                 
-                const isLong = displayContent.length > 120;
+                const isLong = displayContent.length > 160; // ⭐ 160자로 상향
                 const isExpanded = expandedReviews[`critic_${cr.id}`];
                 
                 return (
@@ -428,12 +422,12 @@ export default function GameDetailPage() {
                       </span>
                     </div>
                     
-                    <p className={`text-sm text-foreground/80 mb-3 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
+                    <p className={`text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
                       {displayContent}
                     </p>
                     
-                    {/* ⭐ 더보기 버튼과 '원문/번역본 보기' 버튼을 나란히 배치 */}
-                    <div className="flex items-center gap-4 mb-3">
+                    {/* ⭐ 레이아웃 수정: 최소 높이(min-h)와 자동 마진(ml-auto)을 통해 버튼 흔들림 방지 */}
+                    <div className="flex items-center mt-2 mb-3 min-h-[24px]">
                       {isLong && (
                         <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity">
                           {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
@@ -443,7 +437,7 @@ export default function GameDetailPage() {
                       {cr.content_ko && (
                         <button 
                           onClick={() => toggleOriginal(`critic_${cr.id}`)} 
-                          className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-foreground transition-colors"
+                          className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-foreground transition-colors ml-auto"
                         >
                           {isShowingOriginal ? "🇰🇷 번역본 보기" : "🇺🇸 원문 보기"}
                         </button>
