@@ -8,17 +8,17 @@ import { GAME_CATEGORIES } from "@/lib/constants";
 const Icons = {
   ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
-  
   StarOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
   StarSolid: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" /></svg>,
-  
   HeartOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
   Clock: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 };
 
 type Review = { id: number; content: string; rating: number; author: string; user_id: string | null; created_at: string; game_id?: number; likes?: number; playtime?: number; };
 type Game = { id: number; title: string; description: string; image_url: string; categories: string[]; metacritic_score?: number; opencritic_score?: number; gameseed_score?: number; recommend_count?: number; average_rating?: number; };
-type CriticReview = { id: number; outlet: string; author: string; rating: number; content: string; url: string; };
+
+// ⭐ 타입 업데이트: content_ko (한국어 번역본) 추가
+type CriticReview = { id: number; outlet: string; author: string; rating: number; content: string; content_ko?: string | null; url: string; };
 
 export default function GameDetailPage() {
   const params = useParams();
@@ -32,23 +32,24 @@ export default function GameDetailPage() {
   const [userPlaytime, setUserPlaytime] = useState<number | null>(null);
   
   const [isAdmin, setIsAdmin] = useState(false);
-  
   const [isRecommended, setIsRecommended] = useState(false);
   const [actionLoading, setActionLoading] = useState<"recommend" | null>(null);
 
   const [myReview, setMyReview] = useState("");
   const [myRating, setMyRating] = useState(80);
   
-  // (임시 유지) 게임 정보 수정용 상태 
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", description: "", image_url: "", categories: "" });
-  
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editRating, setEditRating] = useState(80);
   const [loading, setLoading] = useState(true);
+  
   const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
   const toggleReview = (key: string) => setExpandedReviews(prev => ({ ...prev, [key]: !prev[key] }));
+  
+  // ⭐ 원문 보기 토글 상태 추가
+  const [showOriginal, setShowOriginal] = useState<Record<string, boolean>>({});
+  const toggleOriginal = (key: string) => setShowOriginal(prev => ({ ...prev, [key]: !prev[key] }));
+
   const [visibleSteamCount, setVisibleSteamCount] = useState(5);
   const [visibleCriticCount, setVisibleCriticCount] = useState(5);
   const [steamReviews, setSteamReviews] = useState<Review[]>([]); 
@@ -62,10 +63,6 @@ export default function GameDetailPage() {
       setGame(gameData || null);
 
       if (gameData) {
-        setEditForm({
-          title: gameData.title, description: gameData.description || "", image_url: gameData.image_url || "", categories: gameData.categories ? gameData.categories.join(", ") : "",
-        });
-
         const savedGames = JSON.parse(localStorage.getItem("recentGames") || "[]");
         const newGame = { id: gameData.id, title: gameData.title, url: `/review/${gameData.id}` };
         const filteredGames = savedGames.filter((g: any) => g.id !== gameData.id);
@@ -110,19 +107,16 @@ export default function GameDetailPage() {
   const handleToggleRecommend = async () => {
     if (!user) return alert("로그인이 필요합니다.");
     if (!game) return;
-
     try {
       setActionLoading("recommend");
       if (isRecommended) {
         const { error } = await supabase.from("game_recommends").delete().eq("game_id", game.id).eq("user_id", user.id);
         if (error) return alert("추천 취소 실패: " + error.message);
-        
         await supabase.rpc("refresh_game_recommend_count", { target_game_id: game.id });
         setIsRecommended(false);
       } else {
         const { error } = await supabase.from("game_recommends").insert({ game_id: game.id, user_id: user.id });
         if (error) return alert("추천 실패: " + error.message);
-
         await supabase.rpc("refresh_game_recommend_count", { target_game_id: game.id });
         setIsRecommended(true);
       }
@@ -130,20 +124,6 @@ export default function GameDetailPage() {
     } finally {
       setActionLoading(null);
     }
-  };
-
-  // (임시 유지) 게임 정보 업데이트 및 삭제 함수
-  const handleUpdateGame = async () => {
-    if (!confirm("게임 정보를 수정하시겠습니까?")) return;
-    const categoryArray = editForm.categories.split(",").map((c) => c.trim()).filter(Boolean);
-    const { error } = await supabase.from("games").update({ title: editForm.title, description: editForm.description, image_url: editForm.image_url, categories: categoryArray }).eq("id", gameId);
-    if (error) alert("수정 실패: " + error.message); else window.location.reload();
-  };
-
-  const handleDeleteGame = async () => {
-    if (!confirm("정말 이 게임을 삭제하시겠습니까?")) return;
-    const { error } = await supabase.from("games").delete().eq("id", gameId);
-    if (error) alert("삭제 실패: " + error.message); else { alert("삭제되었습니다."); router.push("/review"); }
   };
 
   const handleSubmitReview = async () => {
@@ -199,20 +179,6 @@ export default function GameDetailPage() {
         </button>
 
         <section className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden mb-12 flex flex-col md:flex-row relative transition-colors">
-          {/* ⭐ 게임 정보 수정 폼 (임시 주석 처리)
-          {isEditing && isAdmin ? (
-             <div className="p-8 w-full flex flex-col gap-4">
-              <input type="text" value={editForm.image_url} onChange={(e) => setEditForm({...editForm, image_url: e.target.value})} className="p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="이미지 URL" />
-              <input value={editForm.title} onChange={(e) => setEditForm({...editForm, title: e.target.value})} className="text-2xl font-bold p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="게임 제목" />
-              <textarea value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} className="h-32 p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="게임 설명" />
-              <input value={editForm.categories} onChange={(e) => setEditForm({...editForm, categories: e.target.value})} className="p-3 border border-border rounded-xl bg-muted text-foreground" placeholder="태그 (쉼표로 구분)" />
-              <div className="flex gap-2 mt-4">
-                <button onClick={handleUpdateGame} className="px-6 py-2 bg-primary text-primary-foreground rounded-xl font-bold hover:opacity-90 transition-all">저장</button>
-                <button onClick={() => setIsEditing(false)} className="px-6 py-2 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-muted transition-all">취소</button>
-              </div>
-            </div>
-          ) : (
-          */}
             <>
               <div className="w-full md:w-[40%] h-72 md:h-auto relative bg-muted flex-shrink-0">
                 {game.image_url ? (
@@ -246,9 +212,7 @@ export default function GameDetailPage() {
                     title={isRecommended ? "추천 취소" : "추천하기"}
                   >
                     {isRecommended ? <Icons.StarSolid /> : <Icons.StarOutline />}
-                    <span className="text-sm font-bold">
-                      {actionLoading === "recommend" ? "처리중" : `추천 ${game.recommend_count ?? 0}`}
-                    </span>
+                    <span className="text-sm font-bold">{actionLoading === "recommend" ? "처리중" : `추천 ${game.recommend_count ?? 0}`}</span>
                   </button>
                 </div>
 
@@ -280,23 +244,11 @@ export default function GameDetailPage() {
                     )}
                   </div>
                 </div>
-
-                {/* ⭐ 게임 정보 수정 버튼 (임시 주석 처리)
-                {isAdmin && (
-                  <div className="absolute top-4 right-4 md:top-6 md:right-16 flex gap-2">
-                    <button onClick={() => setIsEditing(true)} className="p-2 text-muted-foreground hover:text-primary transition-colors bg-card rounded-full shadow-sm hover:shadow-md border border-border" title="게임 정보 수정">
-                      <Icons.Edit />
-                    </button>
-                  </div>
-                )}
-                */}
               </div>
             </>
-          {/* ⭐ 게임 정보 수정 폼 닫기 (임시 주석 처리)
-          )}
-          */}
         </section>
 
+        {/* ... 유저 평론 작성 섹션은 기존과 완벽히 동일 (생략 없이 유지) ... */}
         <section className="bg-card p-6 rounded-3xl border border-border shadow-sm relative overflow-hidden group transition-colors mb-10">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-purple-500"></div>
           <div className="flex items-center justify-between mb-5">
@@ -343,6 +295,7 @@ export default function GameDetailPage() {
           )}
         </section>
 
+        {/* 리뷰 탭 영역 */}
         <div className="border-b border-border mb-6 flex gap-6 px-2 overflow-x-auto scrollbar-hide">
           <button onClick={() => setActiveReviewTab("gameseed")} className={`pb-3 text-sm font-extrabold whitespace-nowrap transition-colors relative ${activeReviewTab === "gameseed" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             GameSeed 유저 평론
@@ -364,6 +317,7 @@ export default function GameDetailPage() {
         </div>
 
         <div className="min-h-[400px]">
+          {/* ... GameSeed 리뷰 영역 (생략 없이 동일) ... */}
           {activeReviewTab === "gameseed" && (
             <div className="space-y-4 animate-fade-in">
               {siteReviews.length > 0 ? siteReviews.map((r) => (
@@ -422,6 +376,7 @@ export default function GameDetailPage() {
             </div>
           )}
 
+          {/* ... 스팀 리뷰 영역 (생략 없이 동일) ... */}
           {activeReviewTab === "steam" && (
             <div className="space-y-4 animate-fade-in">
               {steamReviews.length > 0 ? (
@@ -450,11 +405,18 @@ export default function GameDetailPage() {
             </div>
           )}
 
+          {/* ⭐ 전문가 평론 영역 (한글/영문 토글 기능이 추가된 핵심 부분) */}
           {activeReviewTab === "critic" && (
             <div className="space-y-4 animate-fade-in">
               {criticReviews.slice(0, visibleCriticCount).map((cr) => {
-                const isLong = cr.content.length > 120;
+                const isShowingOriginal = showOriginal[`critic_${cr.id}`];
+                
+                // ⭐ 번역본(content_ko)이 있고, '원문보기' 상태가 아니면 한국어를 보여주고, 아니면 영어를 보여줍니다!
+                const displayContent = (!isShowingOriginal && cr.content_ko) ? cr.content_ko : cr.content;
+                
+                const isLong = displayContent.length > 120;
                 const isExpanded = expandedReviews[`critic_${cr.id}`];
+                
                 return (
                   <div key={cr.id} className="bg-amber-50 dark:bg-amber-500/10 p-5 rounded-3xl border border-amber-200 dark:border-amber-500/20 shadow-sm block group transition-colors">
                     <div className="flex justify-between items-center mb-3">
@@ -465,14 +427,29 @@ export default function GameDetailPage() {
                         {cr.rating}
                       </span>
                     </div>
-                    <p className={`text-sm text-foreground/80 mb-2 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
-                      {cr.content}
+                    
+                    <p className={`text-sm text-foreground/80 mb-3 leading-relaxed whitespace-pre-wrap transition-all ${!isExpanded && isLong ? "line-clamp-4" : ""}`}>
+                      {displayContent}
                     </p>
-                    {isLong && (
-                      <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:opacity-80 mb-2 transition-opacity">
-                        {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
-                      </button>
-                    )}
+                    
+                    {/* ⭐ 더보기 버튼과 '원문/번역본 보기' 버튼을 나란히 배치 */}
+                    <div className="flex items-center gap-4 mb-3">
+                      {isLong && (
+                        <button onClick={() => toggleReview(`critic_${cr.id}`)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity">
+                          {isExpanded ? "접기 ▲" : "텍스트 더보기 ▼"}
+                        </button>
+                      )}
+                      
+                      {cr.content_ko && (
+                        <button 
+                          onClick={() => toggleOriginal(`critic_${cr.id}`)} 
+                          className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-foreground transition-colors"
+                        >
+                          {isShowingOriginal ? "🇰🇷 번역본 보기" : "🇺🇸 원문 보기"}
+                        </button>
+                      )}
+                    </div>
+                    
                     <div className="text-xs text-muted-foreground font-medium">by {cr.author}</div>
                   </div>
                 );
