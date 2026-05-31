@@ -169,8 +169,9 @@ export default function HomePage() {
           .limit(8);
         if (latestRev.data) setLatestReviews(latestRev.data as Review[]);
 
+        // 이번 주 인기 평론 (30일로 연장)
         const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 30); 
         const topRev = await supabase.from("reviews")
           .select("*, games(title)")
           .gte("created_at", oneWeekAgo.toISOString())
@@ -189,8 +190,9 @@ export default function HomePage() {
           })) as Community[]);
         }
 
+        // 주간 인기 커뮤니티 (30일로 연장)
         const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 30);
         const topCom = await supabase.from("community")
           .select("*, comments(count)")
           .gte("created_at", sevenDaysAgo.toISOString())
@@ -303,7 +305,6 @@ export default function HomePage() {
                   ))
                 ) : news.length > 0 ? (
                   news.slice(0, 4).map((n) => (
-                    /* ⭐ 새로 만든 MainNewsCard 컴포넌트를 사용합니다! */
                     <MainNewsCard key={n.id} n={n} router={router} />
                   ))
                 ) : <div className="text-sm text-center py-10 border border-dashed rounded-xl border-border">뉴스가 없습니다.</div>}
@@ -368,7 +369,7 @@ export default function HomePage() {
           {/* 오른쪽 컬럼 (커뮤니티) */}
           <div className="lg:col-span-4 flex flex-col gap-6 w-full">
             
-            {/* 인기 게시글 */}
+            {/* ⭐ 주간 인기 커뮤니티 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">주간 인기 커뮤니티 <Icons.ChevronRight /></button>
@@ -390,16 +391,17 @@ export default function HomePage() {
                       <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-xs font-bold ${idx < 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>{idx + 1}</div>
                       <p className="text-sm font-bold group-hover:text-primary truncate transition-colors">{p.title}</p>
                     </div>
-                    <div className="flex items-center justify-end flex-shrink-0 gap-1.5">
-                      <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground"><Icons.Heart /> {p.likes ?? 0}</div>
-                      <div className="text-[11px] font-black text-sky-500">{(p.comment_count ?? 0) > 0 ? `[${p.comment_count}]` : ""}</div>
+                    {/* ⭐ 칼각 고정 적용! (w-12, w-8 사용) */}
+                    <div className="flex items-center justify-end flex-shrink-0">
+                      <div className="flex items-center justify-end gap-0.5 text-[11px] text-muted-foreground w-12"><Icons.Heart /> {p.likes ?? 0}</div>
+                      <div className="text-[11px] font-black text-sky-500 w-10 text-right">{(p.comment_count ?? 0) > 0 ? `[${p.comment_count}]` : ""}</div>
                     </div>
                   </li>
                 )) : <li className="text-xs py-4 text-center text-muted-foreground">게시글이 없습니다.</li>}
               </ul>
             </section>
 
-            {/* 최근 커뮤니티 글 */}
+            {/* ⭐ 최근 커뮤니티 글 */}
             <section className="w-full bg-card rounded-2xl border border-border p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-3 border-b border-border">
                 <button onClick={() => router.push("/community")} className="font-bold text-sm hover:text-primary transition-colors flex items-center gap-1">최근 커뮤니티 글 <Icons.ChevronRight /></button>
@@ -417,9 +419,10 @@ export default function HomePage() {
                     <div className="flex-1 min-w-0 pr-2">
                       <div className="text-sm font-bold group-hover:text-primary truncate transition-colors">{p.title}</div>
                     </div>
-                    <div className="flex items-center justify-end gap-2 flex-shrink-0">
-                      <div className="text-[10px] text-muted-foreground">{formatDate(p.created_at)}</div>
-                      <div className="text-[11px] font-black text-sky-500">{(p.comment_count ?? 0) > 0 ? `[${p.comment_count}]` : ""}</div>
+                    {/* ⭐ 칼각 고정 적용! (w-14, w-8 사용) */}
+                    <div className="flex items-center justify-end flex-shrink-0">
+                      <div className="text-[10px] text-muted-foreground w-14 text-right">{formatDate(p.created_at)}</div>
+                      <div className="text-[11px] font-black text-sky-500 w-10 text-right">{(p.comment_count ?? 0) > 0 ? `[${p.comment_count}]` : ""}</div>
                     </div>
                   </li>
                 )) : <li className="text-xs py-6 text-center text-muted-foreground">게시글이 없습니다.</li>}
