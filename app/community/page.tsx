@@ -291,63 +291,64 @@ export default function CommunityPage() {
             <ul className="divide-y divide-border">
               {posts.map((post) => (
                 <li 
-                  key={post.id} 
-                  onClick={() => router.push(`/community/${post.id}`)}
-                  className="group p-4 hover:bg-accent/40 transition-colors cursor-pointer flex items-center gap-4"
-                >
-                  {/* ⭐ 최적화: w-16 h-16 크기 영역이므로 sizes를 64px(약 4rem)으로 고정 */}
-                  <div className="relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors hidden sm:block">
-                    {post.image_url ? (
-                      <Image 
-                        src={post.image_url} 
-                        alt="" 
-                        fill
-                        sizes="64px"
-                        className="object-cover group-hover:scale-105 transition-transform duration-500" 
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50">
-                        <span className="text-xl font-black tracking-widest text-muted-foreground/40 mt-[-4px]">...</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-black tracking-wider px-1.5 py-0.5 rounded border ${getCategoryBadgeStyle(post.category)}`}>
-                        {getCategoryLabel(post.category)}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-medium">
-                        {(Array.isArray(post.user_profiles) ? post.user_profiles[0]?.nickname : post.user_profiles?.nickname) || post.author || "익명"} · {timeAgo(post.created_at)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                        {post.title}
-                      </h3>
-                      {post.comment_count > 0 && (
-                        <span className="text-[13px] font-black text-rose-500 flex-shrink-0">
-                          [{post.comment_count}]
-                        </span>
+                    key={post.id} 
+                    onClick={() => router.push(`/community/${post.id}`)}
+                    className="group p-4 hover:bg-accent/40 transition-colors cursor-pointer flex items-center gap-3 sm:gap-4"
+                  >
+                    {/* ⭐ 최적화 & 수정: hidden sm:block 제거하고 모바일에서도 보이도록 수정! w/h를 조금 줄여서 모바일 공간 확보 */}
+                    <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors">
+                      {post.image_url ? (
+                        <Image 
+                          src={post.image_url} 
+                          alt="" 
+                          fill
+                          sizes="64px"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50">
+                          <span className="text-xl font-black tracking-widest text-muted-foreground/40 mt-[-4px]">...</span>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="flex-shrink-0 flex items-center gap-4 text-xs font-bold text-muted-foreground ml-2 hidden sm:flex">
-                    <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
-                        <Icons.Heart /> 
-                        <span className={`transition-colors ${post.likes >= POPULAR_THRESHOLD ? "text-orange-500" : "group-hover:text-foreground"}`}>
-                          {post.likes}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-black tracking-wider px-1.5 py-0.5 rounded border ${getCategoryBadgeStyle(post.category)}`}>
+                          {getCategoryLabel(post.category)}
                         </span>
+                        <span className="text-[11px] text-muted-foreground font-medium truncate">
+                          {(Array.isArray(post.user_profiles) ? post.user_profiles[0]?.nickname : post.user_profiles?.nickname) || post.author || "익명"}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                          {post.title}
+                        </h3>
+                        {post.comment_count > 0 && (
+                          <span className="text-[12px] font-black text-rose-500 flex-shrink-0">
+                            [{post.comment_count}]
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col items-center gap-0.5 min-w-[30px]">
-                        <Icons.Eye />
-                        <span className="group-hover:text-foreground transition-colors">{post.views}</span>
+
+                    {/* ⭐ 모바일에서도 조회수/좋아요를 보여주고 싶다면 아래 hidden sm:flex을 지우면 됩니다 */}
+                    <div className="flex-shrink-0 flex items-center gap-3 text-[10px] font-bold text-muted-foreground ml-2">
+                      <div className="flex flex-col items-center gap-0.5 min-w-[24px]">
+                          <Icons.Heart /> 
+                          <span className={`transition-colors ${post.likes >= POPULAR_THRESHOLD ? "text-orange-500" : ""}`}>
+                            {post.likes}
+                          </span>
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5 min-w-[24px]">
+                          <Icons.Eye />
+                          <span>{post.views}</span>
+                      </div>
                     </div>
-                  </div>
-                </li>
+                  </li>
               ))}
             </ul>
           ) : (
