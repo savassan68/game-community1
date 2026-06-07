@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image"; // ⭐ Next.js Image 컴포넌트 추가
-import Link from "next/link";   // ⭐ Next.js Link 컴포넌트 추가
+import Image from "next/image";
+import Link from "next/link";
 import { GameMecaListItem } from "@/lib/gamemeca";
 
 type Props = {
@@ -14,6 +14,7 @@ export default function MainHero({ items = [] }: Props) {
   const [isPaused, setIsPaused] = useState(false);
   const [giveUp, setGiveUp] = useState(false);
 
+  // 데이터 로딩 타임아웃
   useEffect(() => {
     const timer = setTimeout(() => {
       if (items.length === 0) setGiveUp(true);
@@ -21,13 +22,14 @@ export default function MainHero({ items = [] }: Props) {
     return () => clearTimeout(timer);
   }, [items.length]);
 
+  // 슬라이드 자동 넘기기
   useEffect(() => {
     if (!items || items.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % items.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [items?.length, isPaused]);
+  }, [items, isPaused]);
 
   if (!items || items.length === 0) {
     return (
@@ -37,64 +39,77 @@ export default function MainHero({ items = [] }: Props) {
     );
   }
 
+  // 현재 보여줄 아이템 정보
   const currentItem = items[currentIndex];
 
   return (
     <section 
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="group relative w-full h-[250px] sm:h-[320px] bg-slate-900 overflow-hidden rounded-3xl border border-slate-700/50 shadow-2xl"
+      className="group relative w-full h-[250px] sm:h-[320px] bg-slate-900 overflow-hidden rounded-3xl border border-slate-700/50 shadow-2xl transition-all duration-500"
     >
-      {items.map((item, index) => (
-        <div
-          key={`${item.articleUrl}-${index}`}
-          className={`absolute inset-0 transition-all duration-1000 ease-in-out ${
-            currentIndex === index ? "opacity-100 scale-100" : "opacity-0 scale-105 pointer-events-none"
-          }`}
-        >
-          {item.imageUrl ? (
-            // ⭐ <img> 대신 <Image> 사용 (fill 속성으로 꽉 차게 만듦)
-            <Image 
-              src={item.imageUrl} 
-              alt={item.title} 
-              fill 
-              className="object-cover" 
-              priority={index === 0} // 첫 번째 이미지는 제일 먼저 불러오도록 우선순위 지정
-            />
-          ) : (
-            <div className="w-full h-full bg-slate-800" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent" />
-        </div>
-      ))}
+      {/* 이미지 영역: 키(key)를 현재 인덱스로 주어 이미지가 바뀔 때 애니메이션이 트리거되게 함 */}
+      <div className="absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out" key={currentIndex}>
+        {currentItem.imageUrl ? (
+          <Image 
+            src={currentItem.imageUrl} 
+            alt={currentItem.title} 
+            fill 
+            className="object-cover animate-fade-in" // 서서히 나타나는 애니메이션 추가
+            priority
+            unoptimized // 외부 이미지(게임메카 등) 링크일 경우 최적화 에러 방지 위해 추가 권장
+          />
+        ) : (
+          <div className="w-full h-full bg-slate-800" />
+        )}
+        {/* 이미지 위 어두운 그라데이션 (글자 가독성용) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+      </div>
 
-      {/* ⭐ 껍데기 div의 onClick(router.push) 대신 <Link> 컴포넌트로 전체를 감쌈 */}
+      {/* 텍스트 정보 영역 */}
       <Link 
         href={`/news/detail?url=${encodeURIComponent(currentItem.articleUrl)}`}
         className="absolute inset-0 p-6 sm:p-10 flex flex-col justify-end z-20"
       >
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-2 animate-fade-in-up">
           <span className="bg-primary px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-tighter">HOT ISSUE</span>
           <span className="text-[11px] font-bold text-slate-300">{currentItem.createdAt || "최근 소식"}</span>
         </div>
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight line-clamp-2 drop-shadow-lg group-hover:text-primary transition-colors duration-300">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight line-clamp-2 drop-shadow-lg group-hover:text-primary transition-colors duration-300 animate-fade-in-up">
           {currentItem.title}
         </h2>
       </Link>
 
       {/* 하단 인디케이터 버튼 */}
-      <div className="absolute bottom-6 right-8 z-30 flex gap-3">
+      <div className="absolute bottom-6 right-8 z-30 flex gap-2">
         {items.map((_, index) => (
           <button
             key={index}
-            onClick={(e) => { e.preventDefault(); setCurrentIndex(index); }} // Link 클릭이 안 되게 막기
-            className={`h-3 transition-all duration-300 rounded-full border border-white/10 shadow-lg ${
-              currentIndex === index ? "w-14 bg-primary border-primary" : "w-6 bg-white/30 hover:bg-white/60"
+            onClick={(e) => { 
+              e.preventDefault(); 
+              setCurrentIndex(index); 
+            }}
+            className={`h-2 transition-all duration-300 rounded-full border border-white/10 shadow-lg ${
+              currentIndex === index ? "w-10 bg-primary border-primary" : "w-3 bg-white/30 hover:bg-white/60"
             }`}
             aria-label={`Slide ${index + 1}`}
           />
         ))}
       </div>
+
+      {/* 애니메이션용 스타일 (Tailwind 기본에 없는 경우를 대비) */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.8s ease-out; }
+        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
+      `}</style>
     </section>
   );
 }

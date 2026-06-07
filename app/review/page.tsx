@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
 import { GAME_CATEGORIES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import Image from "next/image"; // ⭐ Next.js Image 추가
 
 const Icons = {
   Search: () => (
@@ -107,8 +108,9 @@ function ReviewContent() {
     const loadGames = async () => {
       setLoading(true);
       
+      // ⭐ 최적화: select("*") 대신 화면에 필요한 정보만 정확히 가져와 데이터 용량을 줄입니다.
       let query = supabase.from("games")
-        .select("*")
+        .select("id, title, image_url, categories, release_date, metacritic_score, opencritic_score, recommend_count, average_rating")
         .order("metacritic_score", { ascending: false, nullsFirst: false });
 
       if (selectedCategory !== "all") {
@@ -342,15 +344,23 @@ function ReviewContent() {
                         className="group bg-card border border-border rounded-[1.5rem] overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer"
                       >
                         <div className="h-40 bg-muted overflow-hidden relative">
+                          {/* ⭐ 최적화: 기본 img 태그를 Next.js Image 컴포넌트로 변경 */}
                           {g.image_url ? (
-                            <img src={g.image_url} alt={g.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+                            <Image 
+                              src={g.image_url} 
+                              alt={g.title} 
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 25vw"
+                              className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                              unoptimized // 외부 이미지 에러 방지용
+                            />
                           ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-black">NO IMAGE</div>
                           )}
                         </div>
 
                         <div className="p-4 flex flex-col flex-1">
-                          <h3 className="font-black text-foreground text-sm mb-2 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                          <h3 className="font-black text-foreground text-base mb-2 line-clamp-1 group-hover:text-indigo-600 transition-colors">
                             {g.title}
                           </h3>
                           
@@ -371,7 +381,6 @@ function ReviewContent() {
                             )}
                           </div>
 
-                          {/* ⭐ 이 부분이 변경되었습니다! */}
                           <div className="mt-auto flex items-center justify-between overflow-hidden">
                             <div className="flex items-center gap-2 overflow-hidden pr-2">
                               {/* 태그 한 줄 나열 (truncate) 및 툴팁 */}

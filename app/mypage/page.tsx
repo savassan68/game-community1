@@ -18,7 +18,6 @@ const Icons = {
   Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
   Gamepad: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>,
   Bookmark: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>,
-  // ⭐ 찜한 게임을 위한 별(Star) 아이콘 추가
   Star: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
 };
 
@@ -52,7 +51,6 @@ function MyPageContent() {
   const [steamGames, setSteamGames] = useState<any[]>([]);
   const [myScraps, setMyScraps] = useState<any[]>([]);
   
-  // ⭐ 찜한 게임(북마크) 상태 추가
   const [myBookmarks, setMyBookmarks] = useState<any[]>([]);
 
   const [visibleScraps, setVisibleScraps] = useState(10);
@@ -64,6 +62,9 @@ function MyPageContent() {
   
   const [steamIdInput, setSteamIdInput] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // ⭐ 스팀 64 ID 가이드 보이기/숨기기 상태 추가
+  const [showSteamHelp, setShowSteamHelp] = useState(false);
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -145,14 +146,12 @@ function MyPageContent() {
       const { data: scrapsData } = await supabase.from("scraps").select("*, community(id, title, likes, created_at)").eq("user_id", session.user.id).order("created_at", { ascending: false });
       if (scrapsData) setMyScraps(scrapsData);
 
-      // ⭐ 추천(찜)한 게임 리스트 가져오기 (게임 정보 조인)
-const { data: bookmarksData } = await supabase
-  .from("game_recommends") // ✅ 여기를 수정했습니다!
-  .select("*, games(id, title, image_url)")
-  .eq("user_id", session.user.id)
-  .order("created_at", { ascending: false });
-
-if (bookmarksData) setMyBookmarks(bookmarksData);
+      const { data: bookmarksData } = await supabase
+        .from("game_recommends")
+        .select("*, games(id, title, image_url)")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+      if (bookmarksData) setMyBookmarks(bookmarksData);
 
     } catch (error: any) {
       console.error("데이터 로딩 실패:", error.message);
@@ -451,7 +450,6 @@ if (bookmarksData) setMyBookmarks(bookmarksData);
             <TabButton id="info" label="기본 정보 설정" icon={<Icons.User />} />
             <TabButton id="security" label="계정 및 보안" icon={<Icons.ShieldCheck />} />
             <div className="h-px bg-border my-2 mx-2 transition-colors"></div>
-            {/* ⭐ 찜한 게임 탭 버튼 추가 (스크랩 탭 위에 배치) */}
             <TabButton id="bookmarks" label="찜한 게임" icon={<Icons.Star />} />
             <TabButton id="scraps" label="게시글 스크랩" icon={<Icons.Bookmark />} />
             <TabButton id="posts" label="작성글" icon={<Icons.FileText />} />
@@ -478,8 +476,32 @@ if (bookmarksData) setMyBookmarks(bookmarksData);
                   </div>
                 </div>
 
+                {/* ⭐ 스팀 연동 부분 UI 개선 (가이드 툴팁 추가) */}
                 <div className="pt-8 border-t border-border">
-                  <label className="block text-sm font-bold text-muted-foreground mb-2">스팀 계정 연동 (Steam 64 ID)</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-bold text-muted-foreground">스팀 계정 연동 (Steam 64 ID)</label>
+                    <button
+                      onClick={() => setShowSteamHelp(!showSteamHelp)}
+                      className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold hover:bg-indigo-200 transition-colors"
+                    >
+                      ID 찾는 방법 ❓
+                    </button>
+                  </div>
+
+                  {/* ID 찾는 방법 안내 박스 */}
+                  {showSteamHelp && (
+                    <div className="mb-4 p-3.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-500/30 rounded-xl text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed animate-fade-in transition-colors">
+                      <strong className="block mb-1 text-[13px]">🔍 Steam 64 ID (17자리 숫자) 찾는 방법</strong>
+                      1. Steam 앱 또는 웹사이트 로그인 후 <b>[내 프로필]</b>로 이동합니다.<br />
+                      2. 빈 공간을 우클릭하여 <b>[페이지 URL 복사]</b>를 클릭합니다.<br />
+                      3. URL 끝에 있는 <b>17자리 숫자</b>가 Steam 64 ID입니다.<br />
+                      <span className="text-indigo-600 dark:text-indigo-400 block mt-1">💡 예: https://steamcommunity.com/profiles/<b>76561198000000000</b></span>
+                      <span className="text-muted-foreground block mt-1.5 border-t border-indigo-200/50 pt-1.5">
+                        * 커스텀 URL(영어 아이디)을 사용 중인 경우 <a href="https://steamid.io" target="_blank" rel="noreferrer" className="underline font-bold text-indigo-600 hover:text-indigo-800">steamid.io</a> 사이트에서 본인의 프로필 주소를 검색해 숫자를 확인할 수 있습니다.
+                      </span>
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground mb-4">스팀 64비트 ID를 연동하면 리뷰 작성 시 플레이 시간이 인증 배지로 표시됩니다.</p>
                   
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -585,7 +607,6 @@ if (bookmarksData) setMyBookmarks(bookmarksData);
             </div>
           )}
 
-          {/* ⭐ 새로 추가된 '찜한 게임' 탭 렌더링 영역 */}
           {activeTab === "bookmarks" && (
             <div className="bg-card p-6 sm:p-10 rounded-3xl shadow-sm border border-border transition-all">
               <div className="flex items-center justify-between mb-8 border-b border-border pb-4 transition-colors">

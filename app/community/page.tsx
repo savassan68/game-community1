@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import supabase from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import Image from "next/image"; // ⭐ Next.js Image 컴포넌트 추가
 
 /** ⭐ 아이콘 객체 */
 const Icons = {
@@ -23,7 +24,7 @@ interface Post {
   title: string;
   content?: string;
   author: string;
-  user_profiles?: { nickname: string }; 
+  user_profiles?: any; // ⭐ 배열이든 객체든 다 받도록 any로 수정! (TS 에러 해결)
   created_at: string;
   views: number;
   likes: number;
@@ -89,9 +90,10 @@ export default function CommunityPage() {
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
+      // ⭐ 최적화: 불필요한 'content(본문)'은 제외하고 화면에 필요한 데이터만 뽑아옵니다.
       let query = supabase
         .from("community")
-        .select("*, user_profiles(nickname)", { count: "exact" });
+        .select("id, title, category, created_at, likes, views, comment_count, image_url, author, user_profiles(nickname)", { count: "exact" });
 
       if (activeCategory !== "all") {
         query = query.eq("category", activeCategory);
@@ -101,6 +103,7 @@ export default function CommunityPage() {
         query = query.gte("likes", POPULAR_THRESHOLD);
       }
 
+      // 검색어 필터: DB 상에서 content 조회를 하더라도 select로 반환받지 않으면 속도가 엄청 빠릅니다!
       if (appliedKeyword.trim()) {
         const term = `%${appliedKeyword}%`;
         if (searchType === "title_content") {
@@ -138,9 +141,10 @@ export default function CommunityPage() {
     const oneDayAgo = new Date();
     oneDayAgo.setHours(oneDayAgo.getHours() - 24);
     
+    // ⭐ 최적화: 인기글 박스에는 제목과 댓글 수만 필요하므로 컬럼을 최소화합니다.
     const { data } = await supabase
       .from("community")
-      .select("*, user_profiles(nickname)")
+      .select("id, title, comment_count")
       .gte("created_at", oneDayAgo.toISOString())
       .order("likes", { ascending: false })
       .limit(6);
@@ -156,8 +160,7 @@ export default function CommunityPage() {
     fetchPopularPosts();
   }, [fetchPopularPosts]);
 
-  // ⭐ 2. 강력한 '화면 새로고침' 리스너 추가 
-  // 뒤로가기를 하거나 탭으로 다시 돌아오면 DB에서 잽싸게 최신 조회수를 긁어옵니다.
+  // 화면 새로고침 리스너
   useEffect(() => {
     const handleReturnToPage = () => {
       fetchPosts();
@@ -292,9 +295,17 @@ export default function CommunityPage() {
                   onClick={() => router.push(`/community/${post.id}`)}
                   className="group p-4 hover:bg-accent/40 transition-colors cursor-pointer flex items-center gap-4"
                 >
-                  <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors hidden sm:block">
+                  {/* ⭐ 최적화: w-16 h-16 크기 영역이므로 sizes를 64px(약 4rem)으로 고정 */}
+                  <div className="relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted border border-border transition-colors hidden sm:block">
                     {post.image_url ? (
-                      <img src={post.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image 
+                        src={post.image_url} 
+                        alt="" 
+                        fill
+                        sizes="64px"
+                        className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                        unoptimized
+                      />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50">
                         <span className="text-xl font-black tracking-widest text-muted-foreground/40 mt-[-4px]">...</span>
@@ -308,7 +319,7 @@ export default function CommunityPage() {
                         {getCategoryLabel(post.category)}
                       </span>
                       <span className="text-[11px] text-muted-foreground font-medium">
-                        {post.user_profiles?.nickname || post.author || "익명"} · {timeAgo(post.created_at)}
+                        {(Array.isArray(post.user_profiles) ? post.user_profiles[0]?.nickname : post.user_profiles?.nickname) || post.author || "익명"} · {timeAgo(post.created_at)}
                       </span>
                     </div>
                     

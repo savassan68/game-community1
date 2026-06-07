@@ -23,20 +23,26 @@ export default function NewsPage() {
   const ITEMS_PER_PAGE = 10;
   const listTopRef = useRef<HTMLDivElement>(null);
 
-  const enrichItem = useCallback(async (item: GameMecaListItem): Promise<GameMecaListItem> => {
-    if (item.summary && item.createdAt && item.imageUrl) return item;
+  // ⭐ isHero 옵션 추가: 상단 카드용 뉴스는 무조건 상세 페이지에서 고화질 이미지를 가져옵니다!
+  const enrichItem = useCallback(async (item: GameMecaListItem, isHero: boolean = false): Promise<GameMecaListItem> => {
+    // 히어로 뉴스가 아니고 이미 데이터가 다 있다면 스킵 (속도 최적화)
+    if (!isHero && item.summary && item.createdAt && item.imageUrl) return item;
+    
     try {
-      // ⭐ API 주소를 /api/news/article 로 변경
-      const res = await fetch(`/api/news/article?url=${encodeURIComponent(item.articleUrl)}`, {
-        next: { revalidate: 300 } 
-      });
+      const res = await fetch(`/api/news/article?url=${encodeURIComponent(item.articleUrl)}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         console.error("🚨 상세 기사 조회 에러:", res.status, errData);
         return item;
       }
       const detail = await res.json();
-      return { ...item, summary: item.summary || detail.summary || "", createdAt: item.createdAt || detail.createdAt || "", imageUrl: item.imageUrl || detail.imageUrl || "" };
+      return { 
+        ...item, 
+        summary: detail.summary || item.summary || "", 
+        createdAt: detail.createdAt || item.createdAt || "", 
+        // ⭐ 핵심: 히어로 뉴스는 무조건 detail.imageUrl(본문 고화질 사진)을 1순위로 씁니다!
+        imageUrl: isHero ? (detail.imageUrl || item.imageUrl || "") : (item.imageUrl || detail.imageUrl || "") 
+      };
     } catch (e) { 
       console.error("🚨 상세 기사 fetch 실패:", e); 
     }
@@ -46,17 +52,15 @@ export default function NewsPage() {
   useEffect(() => {
     const loadHeroData = async () => {
       try {
-        // ⭐ API 주소를 /api/news/list 로 변경
-        const res = await fetch("/api/news/list?category=main", { next: { revalidate: 300 } });
+        const res = await fetch("/api/news/list?category=main");
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error("🚨 메인 뉴스 리스트 에러:", res.status, errData);
           throw new Error(`상태 코드: ${res.status}`);
         }
         
         const data = await res.json();
         if (Array.isArray(data)) {
-          const enriched = await Promise.all(data.slice(0, 5).map(item => enrichItem(item)));
+          // ⭐ isHero = true 로 설정해서 상단 5개는 강제로 상세 이미지 추출
+          const enriched = await Promise.all(data.slice(0, 5).map(item => enrichItem(item, true)));
           setMainItems(enriched);
         }
       } catch (err) { 
@@ -71,11 +75,8 @@ export default function NewsPage() {
       setLoading(true);
       setCurrentPage(1);
       try {
-        // ⭐ API 주소를 /api/news/list 로 변경
-        const res = await fetch(`/api/news/list?category=${activeCategory}`, { next: { revalidate: 300 } });
+        const res = await fetch(`/api/news/list?category=${activeCategory}`);
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error(`🚨 카테고리(${activeCategory}) 뉴스 에러:`, res.status, errData);
           throw new Error(`상태 코드: ${res.status}`);
         }
         
