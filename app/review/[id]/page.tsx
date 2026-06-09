@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
 import { GAME_CATEGORIES } from "@/lib/constants";
+import { useToast } from "@/app/components/ToastProvider"; // ⭐ 작성하신 ToastContext 경로에 맞게 수정하세요!
 
 const Icons = {
   ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
@@ -11,6 +12,7 @@ const Icons = {
   StarOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
   StarSolid: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" /></svg>,
   HeartOutline: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
+  HeartSolid: () => <svg className="w-5 h-5 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>,
   Clock: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 };
 
@@ -23,6 +25,9 @@ export default function GameDetailPage() {
   const params = useParams();
   const router = useRouter();
   const gameId = params.id as string;
+  
+  // ⭐ 글로벌 토스트 가져오기
+  const { triggerToast } = useToast();
 
   const [game, setGame] = useState<Game | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -53,6 +58,8 @@ export default function GameDetailPage() {
   const [steamReviews, setSteamReviews] = useState<Review[]>([]); 
   const siteReviews = reviews;
   const [activeReviewTab, setActiveReviewTab] = useState<"gameseed" | "steam" | "critic">("gameseed");
+
+  const [likedReviews, setLikedReviews] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,20 +110,22 @@ export default function GameDetailPage() {
   };
 
   const handleToggleRecommend = async () => {
-    if (!user) return alert("로그인이 필요합니다.");
+    if (!user) return triggerToast("로그인이 필요합니다.");
     if (!game) return;
     try {
       setActionLoading("recommend");
       if (isRecommended) {
         const { error } = await supabase.from("game_recommends").delete().eq("game_id", game.id).eq("user_id", user.id);
-        if (error) return alert("추천 취소 실패: " + error.message);
+        if (error) return triggerToast("추천 취소 실패: " + error.message);
         await supabase.rpc("refresh_game_recommend_count", { target_game_id: game.id });
         setIsRecommended(false);
+        triggerToast("게임 추천을 취소했습니다.");
       } else {
         const { error } = await supabase.from("game_recommends").insert({ game_id: game.id, user_id: user.id });
-        if (error) return alert("추천 실패: " + error.message);
+        if (error) return triggerToast("추천 실패: " + error.message);
         await supabase.rpc("refresh_game_recommend_count", { target_game_id: game.id });
         setIsRecommended(true);
+        triggerToast("게임을 추천했습니다! ⭐");
       }
       await refreshGameCounts(); 
     } finally {
@@ -125,30 +134,86 @@ export default function GameDetailPage() {
   };
 
   const handleSubmitReview = async () => {
-    if (!user) return alert("로그인이 필요합니다.");
-    if (!myReview.trim()) return alert("내용을 입력해주세요.");
-    const { error } = await supabase.from("reviews").insert({ game_id: gameId, content: myReview, rating: myRating, author: user.email, user_id: user.id, playtime: userPlaytime || 0, created_at: new Date().toISOString() });
-    if (error) alert("등록 실패: " + error.message); else window.location.reload();
+    if (!user) return triggerToast("로그인이 필요합니다.");
+    if (!myReview.trim()) return triggerToast("내용을 입력해주세요.");
+    
+    const newReview = { 
+      game_id: Number(gameId), 
+      content: myReview, 
+      rating: myRating, 
+      author: user.email, 
+      user_id: user.id, 
+      playtime: userPlaytime || 0, 
+      created_at: new Date().toISOString() 
+    };
+
+    const { data, error } = await supabase.from("reviews").insert(newReview).select().single();
+    if (error) {
+      triggerToast("등록 실패: " + error.message);
+    } else {
+      setReviews(prev => [data, ...prev]);
+      setMyReview(""); 
+      triggerToast("리뷰가 성공적으로 등록되었습니다!");
+    }
   };
 
   const handleDeleteReview = async (reviewId: number) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    await supabase.from("reviews").delete().eq("id", reviewId);
-    window.location.reload();
+    
+    const { error } = await supabase.from("reviews").delete().eq("id", reviewId);
+    if (!error) {
+      setReviews(prev => prev.filter(r => r.id !== reviewId));
+      triggerToast("리뷰가 삭제되었습니다.");
+    } else {
+      triggerToast("삭제 실패: " + error.message);
+    }
   };
 
   const handleLikeReview = async (reviewId: number, currentLikes: number = 0) => {
-    if (!user) return alert("로그인이 필요합니다.");
-    const { error } = await supabase.from("reviews").update({ likes: currentLikes + 1 }).eq("id", reviewId);
-    if (error) alert("추천 실패: " + error.message); else window.location.reload(); 
+    if (!user) return triggerToast("로그인이 필요합니다.");
+    
+    const isLiked = likedReviews.has(reviewId);
+    const increment = isLiked ? -1 : 1;
+
+    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, likes: (r.likes || 0) + increment } : r));
+    
+    setLikedReviews(prev => {
+      const next = new Set(prev);
+      if (isLiked) next.delete(reviewId);
+      else next.add(reviewId);
+      return next;
+    });
+
+    const { error } = await supabase.from("reviews").update({ likes: currentLikes + increment }).eq("id", reviewId);
+    
+    if (error) {
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, likes: currentLikes } : r));
+      setLikedReviews(prev => {
+        const next = new Set(prev);
+        if (isLiked) next.add(reviewId);
+        else next.delete(reviewId);
+        return next;
+      });
+      triggerToast("처리 중 오류가 발생했습니다.");
+    } else {
+      triggerToast(isLiked ? "추천을 취소했습니다." : "리뷰를 추천했습니다! ❤️");
+    }
   };
 
   const startEditing = (review: Review) => { setEditingReviewId(review.id); setEditContent(review.content); setEditRating(review.rating); };
   const cancelEditing = () => { setEditingReviewId(null); setEditContent(""); };
+  
   const saveEditedReview = async (reviewId: number) => {
-    if (!editContent.trim()) return alert("내용을 입력해주세요.");
+    if (!editContent.trim()) return triggerToast("내용을 입력해주세요.");
+    
     const { error } = await supabase.from("reviews").update({ content: editContent, rating: editRating }).eq("id", reviewId);
-    if (error) alert("수정 실패: " + error.message); else window.location.reload();
+    if (error) {
+      triggerToast("수정 실패: " + error.message);
+    } else {
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, content: editContent, rating: editRating } : r));
+      cancelEditing();
+      triggerToast("리뷰가 수정되었습니다.");
+    }
   };
 
   const getScoreStyle = (score: number) => {
@@ -169,7 +234,7 @@ export default function GameDetailPage() {
   if (loading || !game) return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground font-bold transition-colors">로딩 중...</div>;
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20 transition-colors duration-300">
+    <div className="min-h-screen bg-background text-foreground pb-20 transition-colors duration-300 relative">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 mt-8">
         
         <button onClick={() => router.back()} className="flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-primary mb-6 transition-colors w-fit">
@@ -354,7 +419,12 @@ export default function GameDetailPage() {
                             <div className="text-[11px] font-medium text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleDateString()}</div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <button onClick={() => handleLikeReview(r.id, r.likes)} className="flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors"><Icons.HeartOutline /> {r.likes || 0}</button>
+                            <button 
+                              onClick={() => handleLikeReview(r.id, r.likes)} 
+                              className={`flex items-center gap-1 text-xs font-bold transition-colors ${likedReviews.has(r.id) ? "text-rose-500" : "text-muted-foreground hover:text-rose-400"}`}
+                            >
+                              {likedReviews.has(r.id) ? <Icons.HeartSolid /> : <Icons.HeartOutline />} {r.likes || 0}
+                            </button>
                             {user && user.id === r.user_id && (
                               <div className="flex gap-2 pl-3 border-l border-border">
                                 <button onClick={() => startEditing(r)} className="text-[11px] font-bold text-muted-foreground hover:text-primary transition-colors">수정</button>

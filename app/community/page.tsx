@@ -138,14 +138,15 @@ export default function CommunityPage() {
   }, [activeCategory, sort, appliedKeyword, searchType, currentPage, showOnlyPopular]);
 
   const fetchPopularPosts = useCallback(async () => {
-    const oneDayAgo = new Date();
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    // ⭐ 발표를 위해 24시간 -> 30일로 넉넉하게 연장!
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - 30);
     
     // ⭐ 최적화: 인기글 박스에는 제목과 댓글 수만 필요하므로 컬럼을 최소화합니다.
     const { data } = await supabase
       .from("community")
       .select("id, title, comment_count")
-      .gte("created_at", oneDayAgo.toISOString())
+      .gte("created_at", targetDate.toISOString())
       .order("likes", { ascending: false })
       .limit(6);
     
