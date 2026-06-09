@@ -26,7 +26,6 @@ export default function GameDetailPage() {
   const router = useRouter();
   const gameId = params.id as string;
   
-  // ⭐ 글로벌 토스트 가져오기
   const { triggerToast } = useToast();
 
   const [game, setGame] = useState<Game | null>(null);
@@ -59,7 +58,18 @@ export default function GameDetailPage() {
   const siteReviews = reviews;
   const [activeReviewTab, setActiveReviewTab] = useState<"gameseed" | "steam" | "critic">("gameseed");
 
+  // ⭐ 1. 좋아요 상태
   const [likedReviews, setLikedReviews] = useState<Set<number>>(new Set());
+
+  // ⭐ 2. 유저 정보가 들어오면, 로컬스토리지에 저장된 '좋아요 누른 기록'을 꺼내와서 하트에 불을 켭니다.
+  useEffect(() => {
+    if (user) {
+      const savedLikes = localStorage.getItem(`liked_reviews_${user.id}`);
+      if (savedLikes) {
+        setLikedReviews(new Set(JSON.parse(savedLikes)));
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -169,34 +179,45 @@ export default function GameDetailPage() {
     }
   };
 
+  // ⭐ 3. 완벽하게 개선된 평론 추천 로직
   const handleLikeReview = async (reviewId: number, currentLikes: number = 0) => {
     if (!user) return triggerToast("로그인이 필요합니다.");
     
     const isLiked = likedReviews.has(reviewId);
-    const increment = isLiked ? -1 : 1;
+    const increment = isLiked ? -1 : 1; // 이미 눌렀으면 -1, 아니면 +1
 
+    // A. 화면의 숫자와 하트 불을 먼저 켭니다 (속도 최적화)
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, likes: (r.likes || 0) + increment } : r));
     
     setLikedReviews(prev => {
       const next = new Set(prev);
       if (isLiked) next.delete(reviewId);
       else next.add(reviewId);
+      
+      // ⭐ B. 브라우저에 기록을 영구 저장해서 새로고침해도 기억하게 만듭니다.
+      localStorage.setItem(`liked_reviews_${user.id}`, JSON.stringify(Array.from(next)));
       return next;
     });
 
+    // C. 백그라운드에서 DB 업데이트
     const { error } = await supabase.from("reviews").update({ likes: currentLikes + increment }).eq("id", reviewId);
     
     if (error) {
+      // 실패하면 다시 숫자를 원래대로 깎고 기록에서 지웁니다.
       setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, likes: currentLikes } : r));
       setLikedReviews(prev => {
         const next = new Set(prev);
         if (isLiked) next.add(reviewId);
         else next.delete(reviewId);
+        localStorage.setItem(`liked_reviews_${user.id}`, JSON.stringify(Array.from(next)));
         return next;
       });
       triggerToast("처리 중 오류가 발생했습니다.");
     } else {
       triggerToast(isLiked ? "추천을 취소했습니다." : "리뷰를 추천했습니다! ❤️");
+      
+      // ⭐ D. 홈페이지나 다른 캐시된 페이지가 최신 추천 수를 가져가도록 새로고침 트리거!
+      router.refresh();
     }
   };
 
